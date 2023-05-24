@@ -142,4 +142,37 @@ Proof.
     + intros H. rewrite <- H. reflexivity.
 Qed.
 
+(* shorthand for `destruct` pattern *)
+Theorem plus_1_neq_0' : forall n : nat,
+    (n + 1) =? 0 = false.
+Proof.
+  intros [|n].
+  - reflexivity.
+  - reflexivity. Qed.
 
+(* If there are no constructor arguments that need names, it's
+ * enough to write [].
+ *)
+Theorem andb_commutative'' : forall b c,
+    andb b c = andb c b.
+Proof.
+  intros [] [].
+  - reflexivity.
+  - reflexivity.
+  - reflexivity.
+  - reflexivity.
+Qed.
+
+(* Execise *)
+Theorem zero_nbeq_plus_1 : forall n : nat,
+    0 =? (n + 1) = false.
+Proof.
+  intros [|n].
+  - reflexivity.
+  - reflexivity. Qed.
+
+(* Exercise *)
+Theorem identity_fn_applied_twice : forall (f : bool -> bool),
+    (forall (x : bool), f x = x) -> forall (b : bool), f (f b) = b.
+Proof.
+  
