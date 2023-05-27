@@ -131,4 +131,88 @@ Qed.
 Theorem add_assoc: forall n m p : nat,
     n + (m + p) = (n + m) + p.
 Proof.
-  Admitted.
+  induction n as [|n' IHn'].
+
+  induction m as [|m' IHm'].
+  induction p as [|p' IHp'].
+  simpl. reflexivity.
+  rewrite -> add_0_l. simpl. reflexivity.
+
+  induction p as [|p' IHp'].
+  rewrite -> add_0_l. simpl. reflexivity.
+  rewrite -> add_0_l. simpl. reflexivity.
+
+  induction m as [|m' IHm'].
+  induction p as [|p' IHp'].
+  simpl. rewrite -> add_0_r. rewrite -> add_0_r. reflexivity.
+  rewrite <- add_0_l. simpl. rewrite -> add_0_r. reflexivity.
+
+  induction p as [|p' IHp'].
+  rewrite <- add_0_r. simpl. rewrite -> add_0_r.
+  rewrite -> add_0_r. rewrite -> add_0_r. reflexivity.
+  simpl. rewrite <- IHn'. reflexivity.
+Qed.
+
+
+Fixpoint double (n : nat) :=
+  match n with
+  | O => O
+  | S n' => S (S (double n'))
+  end.
+
+Lemma double_plus: forall n,
+    double n = n + n.
+Proof.
+  induction n as [|n' IHn'].
+  simpl. reflexivity.
+  (* double S n' = S n' + S n' *)
+  simpl. rewrite -> IHn'. rewrite -> plus_n_Sm. reflexivity.
+Qed.
+
+Theorem eqb_refl: forall n : nat,
+    (n =? n) = Datatypes.true.
+Proof.
+  induction n as [|n' IHn'].
+  simpl. reflexivity.
+  (* eqb n' n' = true *)
+  simpl. rewrite -> IHn'. reflexivity.
+Qed.
+
+(* In Coq, as in informal mathematics, large proofs are often broken into se
+ * sequence of theorems, with later proofs referring to earlier theorems. But
+ * sometimes a proof will involve some miscellaneous fact that is too trivial
+ * and of too little general interest to bother giving it its own top-level
+ * name. In such cases, it is convenient to be able to simply state and prove
+ * the needed "sub-theorem" right at the point where it is used.
+ *
+ * The assert tactic introduces two sub-goals. The first is the assertion itself;
+ * by prefixing it with H: we name the assertion H. The second goal is the same
+ * as the one at the point where we invoke assert except that, in the context,
+ * we now have the assumption H that n + 0 + 0 = n. That is, assert generates
+ * one subgoal where we must prove the asserted fact and a second subgoal where
+ * we can use the asserted fact to make progress on whatever we were trying to
+ * prove in the first place.
+ *)
+Theorem mult_0_plus': forall n m : nat,
+    (n + 0 + 0) * m = n * m.
+Proof.
+  intros n m.
+  assert (H: n + 0 + 0 = n).
+  { rewrite add_comm. simpl. rewrite add_comm. reflexivity. }
+  rewrite -> H.
+  reflexivity. Qed.
+
+Theorem plus_rearrange: forall n m p q : nat,
+    (n + m) + (p + q) = (m + n) + (p + q).
+Proof.
+  intros n m p q.
+  assert (n + m = m + n) as H.    (* for the particular n and m we need *)
+  { rewrite -> add_comm. reflexivity. }
+  rewrite -> H. reflexivity. Qed.
+
+Theorem add_assoc': forall n m p : nat,
+    n + (m + p) = (n + m) + p.
+Proof.
+  intros n m p. induction n as [|n' IHn'].
+  reflexivity.
+  simpl. rewrite -> IHn'. reflexivity. Qed.
