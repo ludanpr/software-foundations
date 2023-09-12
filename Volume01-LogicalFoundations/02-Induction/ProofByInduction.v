@@ -111,6 +111,14 @@ Proof.
   simpl. rewrite -> IHn'. reflexivity.
 Qed.
 
+Theorem plus_n_Sm': forall n m : nat,
+    S (n + m) = n + (S m).
+Proof.
+  induction n as [|n' IHn'].
+  reflexivity.
+  intros m. simpl. rewrite -> IHn'. reflexivity.
+Qed.
+
 Theorem add_comm: forall n m : nat,
     n + m = m + n.
 Proof.
@@ -125,6 +133,15 @@ Proof.
   rewrite -> add_0_r. rewrite -> add_0_l. reflexivity.
   (* n + m = m + n *)
   (* n = S n', m = S m' => S n' + S m' = S m' + S n' *)
+  simpl. rewrite -> IHn'. rewrite -> plus_n_Sm. reflexivity.
+Qed.
+
+Theorem add_comm': forall n m : nat,
+    n + m = m + n.
+Proof.
+  intros n m.
+  induction n as [|n' IHn'].
+  rewrite -> add_0_r. reflexivity.
   simpl. rewrite -> IHn'. rewrite -> plus_n_Sm. reflexivity.
 Qed.
 
@@ -151,6 +168,14 @@ Proof.
   rewrite <- add_0_r. simpl. rewrite -> add_0_r.
   rewrite -> add_0_r. rewrite -> add_0_r. reflexivity.
   simpl. rewrite <- IHn'. reflexivity.
+Qed.
+
+Theorem add_assoc': forall n m p : nat,
+    n + (m + p) = (n + m) + p.
+Proof.
+  induction n as [|n' IHn'].
+  simpl. reflexivity.
+  intros m p. simpl. rewrite -> IHn'. rewrite -> plus_n_Sm. reflexivity.
 Qed.
 
 
@@ -210,9 +235,38 @@ Proof.
   { rewrite -> add_comm. reflexivity. }
   rewrite -> H. reflexivity. Qed.
 
-Theorem add_assoc': forall n m p : nat,
+(* Review practice *)
+Theorem plus_rearrange': forall n m p q : nat,
+    (n + m) + (p + q) = (m + n) + (p + q).
+Proof.
+  intros n m p q.
+  assert (H: n + m = m + n).
+  { rewrite -> add_comm. reflexivity. }
+  rewrite -> H. reflexivity.
+Qed.
+
+Theorem add_assoc'': forall n m p : nat,
     n + (m + p) = (n + m) + p.
 Proof.
   intros n m p. induction n as [|n' IHn'].
   reflexivity.
   simpl. rewrite -> IHn'. reflexivity. Qed.
+
+Theorem add_shuffle3: forall n m p : nat,
+    n + (m + p) = m + (n + p).
+Proof.
+  intros n m p.
+  assert (H: n + m = m + n).
+  { rewrite -> add_comm. reflexivity. }
+  rewrite -> add_assoc.
+  rewrite -> H.
+  rewrite -> add_assoc. reflexivity.
+Qed.
+
+Theorem mul_comm: forall m n : nat,
+    m * n = n * m.
+Proof.
+  intros n m.
+  destruct m as [|m'].
+  - simpl. rewrite -> mul_0_r. reflexivity.
+  - Abort.
