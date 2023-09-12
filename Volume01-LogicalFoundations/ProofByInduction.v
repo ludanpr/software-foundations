@@ -7,12 +7,14 @@
  * First create a file named _CoqProject containing the following line:
  *
  *   -Q ../01-Basics/ LF
+ *   -Q . LF
  *
  * This maps the directory ../01-Basics/ to the prefix LF. If we want to
  * be able to compile from command-line, generate a Makefile using the
  * coq_makefile utility:
  *
  *   coq_makefile -f _CoqProject ../01-Basics/*.v *.v -o Makefile
+ *   coq_makefile -f _CoqProject *.v -o Makefile
  *)
 From LF Require Export BinaryNumerals.
 From LF Require Export Booleans.
