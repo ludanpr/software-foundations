@@ -329,6 +329,13 @@ Proof.
     simpl. rewrite -> IHv'. reflexivity. }
   simpl. rewrite -> H. rewrite -> add_comm. reflexivity. Qed.
 
+Theorem add_inc_count': forall (v : nat) (s : bag),
+    count v (add v s) = (count v s) + 1.
+Proof.
+  intros v s.
+  simpl. rewrite -> eqb_refl. rewrite -> add_comm.
+  reflexivity. Qed.
+
 
 (*                       *)
 (* Reasoning About Lists *)
@@ -553,5 +560,193 @@ Proof.
       simpl. rewrite -> IHl1'. reflexivity. Qed.
 
 
+Fixpoint eqblist (l1 l2 : natlist) : bool :=
+  match l1, l2 with
+    | nil, nil => true
+    | nil, _ => false
+    | _, nil => false
+    | h1 :: t1, h2 :: t2 => match h1 =? h2 with
+                              | Datatypes.false => false
+                              | _ => eqblist t1 t2
+                            end
+  end.
+
+Example test_eqblist1: (eqblist nil nil = true).
+Proof. reflexivity. Qed.
+Example test_eqblist2: eqblist [1;2;3] [1;2;3] = true.
+Proof. reflexivity. Qed.
+Example test_eqblist3: eqblist [1;2;3] [1;2;4] = false.
+Proof. reflexivity. Qed.
+
+Theorem eqblist_refl: forall l : natlist,
+    true = eqblist l l.
+Proof.
+  intros l. induction l as [| n l' IHl'].
+  - (* l = nil *)
+    reflexivity.
+  - (* l = cons n l' *)
+    simpl. rewrite -> eqb_refl.
+    rewrite -> IHl'. reflexivity. Qed.
+
+
+Theorem count_member_nonzero: forall (s : bag),
+    1 <=? (count 1 (1 :: s)) = Datatypes.true.
+Proof.
+  simpl. reflexivity. Qed.
+
+Theorem leb_n_Sn: forall n,
+    n <=? (S n) = Datatypes.true.
+Proof.
+  intros n. induction n as [| n' IHn'].
+  - (* n = O *)
+    simpl. reflexivity.
+  - (* n = S n' *)
+    simpl. rewrite -> IHn'. reflexivity. Qed.
+
+Theorem remove_does_not_increase_count: forall (s : bag),
+    (count 0 (remove_one 0 s)) <=? (count 0 s) = Datatypes.true.
+Proof.
+  intros s. induction s as [| n s' IHs'].
+  - (* s = nil *)
+    simpl. reflexivity.
+  - (* s = cons n s' *)
+    simpl. destruct n as [| n'].
+    * (* n = O *)
+      simpl. rewrite -> leb_n_Sn. reflexivity.
+    * (* n = S n' *)
+      simpl. rewrite -> IHs'. reflexivity. Qed.
+
+Theorem involution_injective: forall (f : nat -> nat),
+    (forall n : nat, n = f (f n)) -> (forall n1 n2 : nat, f n1 = f n2 -> n1 = n2).
+Proof.
+  intros f H1 n1 n2 H2.
+  simpl.
+  rewrite -> H1.
+  rewrite <- H2.
+  rewrite <- H1. reflexivity. Qed.
+
+Theorem rev_injective: forall (l1 l2 : natlist),
+    rev l1 = rev l2 -> l1 = l2.
+Proof.
+  intros l1 l2 H.
+  simpl.
+  rewrite <- rev_involutive.
+  rewrite <- H.
+  rewrite -> rev_involutive. reflexivity. Qed.
+
+(*         *)
+(* Options *)
+(*         *)
+
+Inductive natoption : Type :=
+  | Some (n : nat)
+  | None.
+
+Fixpoint nth_error (l : natlist) (n : nat) : natoption :=
+  match l with
+  | nil => None
+  | a :: l' => match n with
+               | O => Some a
+               | S n' => nth_error l' n'
+               end
+  end.
+
+Example test_nth_error1: nth_error [4;5;6;7] 0 = Some 4.
+Proof. reflexivity. Qed.
+Example test_nth_error2: nth_error [4;5;6;7] 3 = Some 7.
+Proof. reflexivity. Qed.
+Example test_nth_error3: nth_error [4;5;6;7] 9 = None.
+Proof. reflexivity. Qed.
+
+(* Pulls the `nat` out of a `natoption`, returning a supplied default
+ * in the `None` case. *)
+Definition option_elim (d : nat) (o : natoption) : nat :=
+  match o with
+  | Some n' => n'
+  | None => d
+  end.
+
+
+(* Using the same idea, fix the `hd` function from earlier so we don't
+ * have to pass a default element for the `nil` case. *)
+Definition hd_error (l : natlist) : natoption :=
+  match l with
+  | nil => None
+  | h :: t => Some h
+  end.
+
+Example test_hd_error1: hd_error [] = None.
+Proof. reflexivity. Qed.
+Example test_hd_error2: hd_error [1] = Some 1.
+Proof. reflexivity. Qed.
+Example test_hd_error3: hd_error [5;6] = Some 5.
+Proof. reflexivity. Qed.
+
+
+Theorem option_elim_hd: forall (l : natlist) (default : nat),
+    hd default l = option_elim default (hd_error l).
+Proof.
+  intros l default. induction l as [| n l' IHl'].
+  - (* l = nil *)
+    simpl. reflexivity.
+  - (* l = cons n l' *)
+    simpl. reflexivity. Qed.
+
+
+(*              *)
+(* Partial Maps *)
+(*              *)
+
+Inductive id : Type :=
+  | Id (n : nat).
+
+Definition eqb_id (x1 x2 : id) :=
+  match x1, x2 with
+  | Id n1, Id n2 => n1 =? n2
+  end.
+
+Theorem eqb_id_refl: forall x,
+    eqb_id x x = Datatypes.true.
+Proof.
+  intros x. destruct x.
+  simpl. rewrite -> eqb_refl. reflexivity. Qed.
 
 End NatList.
+
+
+Module PartialMap.
+Export NatList.
+
+(* There are two ways to construct a partial_map: either using the constructor
+ * empty to represent an empty partial map, or applying the constructor record
+ * to a key, a value, and an existing partial_map to construct a partial_map
+ * with an additional key-to-value mapping.
+ *)
+Inductive partial_map : Type :=
+  | empty
+  | record (i : id) (v : nat) (m : partial_map).
+
+Definition update (d : partial_map) (x : id) (value : nat) : partial_map :=
+  record x value d.
+
+Fixpoint find (x : id) (d : partial_map) : natoption :=
+  match d with
+  | empty => None
+  | record y v d' => if eqb_id x y then Some v else find x d'
+  end.
+
+
+Theorem update_eq: forall (d : partial_map) (x : id) (v : nat),
+    find x (update d x v) = Some v.
+Proof.
+  intros d x v.
+  simpl. rewrite -> eqb_id_refl. reflexivity. Qed.
+
+Theorem update_neq: forall (d : partial_map) (x y : id) (o : nat),
+    eqb_id x y = Datatypes.false -> find x (update d y o) = find x d.
+Proof.
+  intros d x y o H.
+  simpl. rewrite -> H. reflexivity. Qed.
+
+End PartialMap.
+
