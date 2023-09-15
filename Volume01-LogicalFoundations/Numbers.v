@@ -170,9 +170,17 @@ Fixpoint leb (n m : nat) : bool :=
 Definition ltb (n m : nat) : bool :=
   (leb n m) && (negb (eqb n m)).
 
+Definition gtb (n m : nat) : bool :=
+  negb (leb n m).
+
+Definition geb (n m : nat) : bool :=
+  negb (ltb n m).
+
 Notation "x =? y" := (eqb x y) (at level 70) : nat_scope.
 Notation "x <=? y" := (leb x y) (at level 70) : nat_scope.
 Notation "x <? y" := (ltb x y) (at level 70) : nat_scope.
+Notation "x >? y" := (gtb x y) (at level 70) : nat_scope.
+Notation "x >=? y" := (geb x y) (at level 70) : nat_scope.
 
 Example test_eqb1: (eqb 0 0) = true.
 Proof. simpl. reflexivity. Qed.
@@ -211,4 +219,30 @@ Proof. simpl. reflexivity. Qed.
 Example test_ltb2': (2 <? 4) = true.
 Proof. simpl. reflexivity. Qed.
 Example test_ltb3': (4 <? 2) = false.
+Proof. simpl. reflexivity. Qed.
+
+Example test_gtb1: (gtb 2 2) = false.
+Proof. simpl. reflexivity. Qed.
+Example test_gtb2: (gtb 2 4) = false.
+Proof. simpl. reflexivity. Qed.
+Example test_gtb3: (gtb 4 2) = true.
+Proof. simpl. reflexivity. Qed.
+Example test_gtb1': (2 >? 2) = false.
+Proof. simpl. reflexivity. Qed.
+Example test_gtb2': (2 >? 4) = false.
+Proof. simpl. reflexivity. Qed.
+Example test_gtb3': (4 >? 2) = true.
+Proof. simpl. reflexivity. Qed.
+
+Example test_geb1: (geb 2 2) = true.
+Proof. simpl. reflexivity. Qed.
+Example test_geb2: (geb 2 4) = false.
+Proof. simpl. reflexivity. Qed.
+Example test_geb3: (geb 4 2) = true.
+Proof. simpl. reflexivity. Qed.
+Example test_geb1': (2 >=? 2) = true.
+Proof. simpl. reflexivity. Qed.
+Example test_geb2': (2 >=? 4) = false.
+Proof. simpl. reflexivity. Qed.
+Example test_geb3': (4 >=? 2) = true.
 Proof. simpl. reflexivity. Qed.
