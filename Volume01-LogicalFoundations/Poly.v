@@ -557,7 +557,49 @@ Proof.
   - reflexivity.
   - simpl. rewrite <- IHl'. reflexivity. Qed.
 
-(* Currying *)
+(* Currying
+ *
+ * The type X → Y → Z can be read as describing functions that take two arguments, one of
+ * type X and another of type Y, and return an output of type Z. Strictly speaking, this
+ * type is written X → (Y → Z) when fully parenthesized. That is, if we have f : X → Y → Z,
+ * and we give f an input of type X, it will give us as output a function of type Y → Z. If
+ * we then give that function an input of type Y, it will return an output of type Z. That is,
+ * every function in Coq takes only one input, but some functions return a function as output.
+ * This is precisely what enables partial application.
+ *
+ * By contrast, functions of type X × Y → Z -- which when fully parenthesized is written (X × Y)
+ * → Z -- require their single input to be a pair. Both arguments must be given at once; there is
+ * no possibility of partial application. It is possible to convert a function between these two
+ * types. Converting from X × Y → Z to X → Y → Z is called currying, in honor of the logician
+ * Haskell Curry. Converting from X → Y → Z to X × Y → Z is called uncurrying.
+ *)
+
+Definition prod_curry {X Y Z : Type} (f : X * Y -> Z) (x : X) (y : Y) : Z := f (x, y).
+Definition prod_uncurry {X Y Z : Type} (f : X -> Y -> Z) (p : X * Y) : Z :=
+  match p with
+  | (x, y) => (f x) y
+  end.
+
+(* As a (trivial) example of the usefulness of currying, we can use it to shorten one of the
+ * examples that we saw above:
+ *)
+Example test_map1': map (plus 3) [2;0;2] = [5;3;5].
+Proof. reflexivity. Qed.
+
+Check @prod_curry.    (* forall X Y Z : Type, (X * Y -> Z) -> X -> Y -> Z *)
+Check @prod_uncurry.  (* forall X Y Z : Type, (X -> Y -> Z) -> X * Y -> Z *)
+
+Theorem uncurry_curry: forall (X Y Z : Type) (f : X -> Y -> Z) x y,
+    prod_curry (prod_uncurry f) x y = f x y.
+Proof.
+  simpl. reflexivity. Qed.
+
+Theorem curry_uncurry: forall (X Y Z : Type) (f : (X * Y) -> Z) (p : X * Y),
+    prod_uncurry (prod_curry f) p = f p.
+Proof.
+  intros. destruct p.
+  simpl. reflexivity. Qed.
+
 
 
 End Exercises.
