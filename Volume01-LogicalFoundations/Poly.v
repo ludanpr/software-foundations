@@ -600,7 +600,42 @@ Proof.
   intros. destruct p.
   simpl. reflexivity. Qed.
 
+(* Churchu Numerals
+ *
+ * The following exercises explore an alternative way of defining natural numbers using the Church
+ * numerals. We can represent a natural number n as a function that takes a function f as a parameter
+ * and returns f iterated n times.
+ *)
+Module Church.
 
+Definition cnat := forall X : Type, (X -> X) -> X -> X.
+
+Definition one : cnat := fun (X : Type) (f : X -> X) (x : X) => f x.
+Definition two : cnat := fun (X : Type) (f : X -> X) (x : X) => f (f x).
+Definition three : cnat := fun (X : Type) (f : X -> X) (x : X) => f (f (f x)).
+Definition zero : cnat := fun (X : Type) (f : X -> X) (x : X) => x.
+
+(* More generally, a number n can be written as fun X f x ⇒ f (f ... (f x) ...), with n occurrences
+ * of f. Let's informally notate that as fun X f x ⇒ f^n x, with the convention that f^0 x is just x.
+ *
+ * Another way to think about the Church representation is that function f represents the successor
+ * operation on X, and value x represents the zero element of X. We could even rewrite with those names
+ * to make it clearer:
+ *)
+Definition zero' : cnat := fun (X : Type) (succ : X -> X) (zero : X) => zero.
+Definition one' : cnat := fun (X : Type) (succ : X -> X) (zero : X) => succ zero.
+Definition two' : cnat := fun (X : Type) (succ : X -> X) (zero : X) => succ (succ zero).
+
+(* If we passed in `S` as `succ` and `O` as `zero`, we'd even get the Peano naturals as a result
+ *)
+Example zero_church_peano : zero nat S O = 0.
+Proof. reflexivity. Qed.
+Example one_church_peano : one nat S O = 1.
+Proof. reflexivity. Qed.
+Example two_church_peano : two nat S O = 2.
+Proof. reflexivity. Qed.
+
+End Church.
 
 End Exercises.
 
