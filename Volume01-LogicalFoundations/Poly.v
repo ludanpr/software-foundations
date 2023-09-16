@@ -433,5 +433,133 @@ Proof.
     simpl. rewrite <- IHl'.
     simpl. rewrite <- map_assoc. reflexivity. Qed.
 
+(* The function map maps a list X to a list Y using a function of type X → Y.
+ * We can define a similar function, flat_map, which maps a list X to a list Y
+ * using a function f of type X → list Y. Your definition should work by
+ * 'flattening' the results of f.
+ *)
+Fixpoint flat_map {X Y : Type} (f : X -> list Y) (l : list X) : list Y :=
+  match l with
+  | [] => []
+  | h :: t => app (f h) (flat_map f t)
+  end.
+
+Example test_flat_map1: flat_map (fun n => [n;n;n]) [1;5;4] = [1; 1; 1; 5; 5; 5; 4; 4; 4].
+Proof. reflexivity. Qed.
+Example test_flat_map2: flat_map (fun n => [n;n+1;n+2]) [1;5;10] = [1;2;3;5;6;7;10;11;12].
+Proof. reflexivity. Qed.
+
+Definition option_map {X Y : Type} (f : X -> Y) (xo : option X) : option Y :=
+  match xo with
+  | None => None
+  | Some x => Some (f x)
+  end.
+
+(* Fold
+ *
+ * An even more powerful higher-order function is called `fold`. Intuitively, the
+ * behavior of the `fold` operator is to insert a given binary operator `f` between
+ * every pair of elements in a given list.
+ *)
+Fixpoint fold {X Y : Type} (f : X -> Y -> Y) (l : list X) (b : Y) : Y :=
+  match l with
+  | nil => b
+  | h :: t => f h (fold f t b)
+  end.
+
+Check (fold andb) : list bool -> bool -> bool.
+
+Example test_fold1: fold plus [1;2;3;4] 0 = 10.
+Proof. reflexivity. Qed.
+Example test_fold2: fold mult [1;2;3;4] 1 = 24.
+Proof. reflexivity. Qed.
+Example test_fold3: fold andb [true;true;false;true] true = false.
+Proof. reflexivity. Qed.
+Example test_fold4: fold app [[1];[];[2;3];[4]] [] = [1;2;3;4].
+Proof. reflexivity. Qed.
+
+(* Functions That Construct Functions
+ *
+ * Most of the higher-order functions we have talked about so far take functions as arguments.
+ * Let's look at some examples that involve returning functions as the results of other functions.
+ *)
+
+Definition constfun {X : Type} (x : X) : nat -> X :=
+  fun (k : nat) => x.
+
+Definition ftrue := constfun true.
+
+Example constfun_example1: ftrue 0 = true.
+Proof. reflexivity. Qed.
+Example constfun_example2: (constfun 5) 99 = 5.
+Proof. reflexivity. Qed.
+
+(* In fact, the multiple-argument functions we have already seen are also examples of passing
+ * functions as data. To see why, recall the type of plus.
+ *
+ * Each → in this expression is actually a binary operator on types. This operator is right-
+ * associative, so the type of plus is really a shorthand for nat → (nat → nat) -- i.e., it
+ * can be read as saying that "plus is a one-argument function that takes a nat and returns
+ * a one-argument function that takes another nat and returns a nat."
+ *)
+Check plus : nat -> nat -> nat.
+
+Definition plus3 := plus 3.
+Check plus3 : nat -> nat.
+
+Example test_plus3_1: plus3 4 = 7.
+Proof. reflexivity. Qed.
+Example test_plus3_2: doit3times plus3 0 = 9.
+Proof. reflexivity. Qed.
+Example test_plus3_3: doit3times (plus 3) 0 = 9.
+Proof. reflexivity. Qed.
+
+(*                      *)
+(* Additional Exercises *)
+(*                      *)
+Module Exercises.
+
+Definition fold_length {X : Type} (l : list X) : nat :=
+  fold (fun _ n => S n) l O.
+
+Example test_fold_length1: @fold_length nat [] = 0.
+Proof. reflexivity. Qed.
+Example test_fold_length2: fold_length [4;7;0] = 3.
+Proof. reflexivity. Qed.
+
+Theorem fold_length_correct: forall X (l : list X),
+    fold_length l = length l.
+Proof.
+  intros X l. induction l as [| n l' IHl'].
+  - (* l = nil X *)
+    reflexivity.
+  - (* l = cons X n l' *)
+    simpl. rewrite <- IHl'. reflexivity. Qed.
+
+
+Definition fold_map {X Y : Type} (f : X -> Y) (l : list X) : list Y :=
+  fold (fun x y => (f x) :: y) l [].
+
+Example test_fold_map1: fold_map (fun x => plus 3 x) [2;0;2] = [5;3;5].
+Proof. reflexivity. Qed.
+Example test_fold_map2: fold_map odd [2;1;2;5] = [false;true;false;true].
+Proof. reflexivity. Qed.
+Example test_fold_map3: fold_map (fun n => [even n; odd n]) [2;1;2;5]
+                        = [[true;false];[false;true];[true;false];[false;true]].
+Proof. reflexivity. Qed.
+Example test_fold_map4: fold_map (fun x => x) [] = @nil nat.
+Proof. reflexivity. Qed.
+
+Theorem fold_map_correct: forall X Y (f : X -> Y) (l : list X),
+    fold_map f l = map f l.
+Proof.
+  intros X Y f l. induction l as [| n l' IHl'].
+  - reflexivity.
+  - simpl. rewrite <- IHl'. reflexivity. Qed.
+
+(* Currying *)
+
+
+End Exercises.
 
 End Poly.
