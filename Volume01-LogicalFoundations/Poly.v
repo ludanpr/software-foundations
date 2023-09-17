@@ -5,8 +5,6 @@ Set Warnings "-notation-overridden,-parsing,-deprecated-hint-without-locality".
 From LF Require Export Lists.
 Import Datatypes.
 
-Module Poly.
-
 (* Coq supports polymorphic inductive type definitions.
  *
  * A good way of thinking about `list` is that the definition of `list` is
@@ -133,6 +131,22 @@ Example test_repeat'''1: repeat''' 0 0 = nil.
 Proof. reflexivity. Qed.
 Example test_repeat'''2: repeat''' 0 3 = cons 0 (cons 0 (cons 0 nil)).
 Proof. reflexivity. Qed.
+
+(* (Note that we didn't even have to provide a type argument to the
+   recursive call to [repeat'''].  Indeed, it would be invalid to
+   provide one, because Coq is not expecting it.)
+
+   We will use the latter style whenever possible, but we will
+   continue to use explicit [Argument] declarations for [Inductive]
+   constructors.  The reason for this is that marking the parameter
+   of an inductive type as implicit causes it to become implicit for
+   the type itself, not just for its constructors.  For instance,
+   consider the following alternative definition of the [list]
+   type: *)
+Inductive list' {X:Type} : Type :=
+  | nil'
+  | cons' (x : X) (l : list').
+
 
 Fixpoint app {X : Type} (l1 l2 : list X) : list X :=
   match l1 with
@@ -638,5 +652,3 @@ Proof. reflexivity. Qed.
 End Church.
 
 End Exercises.
-
-End Poly.
