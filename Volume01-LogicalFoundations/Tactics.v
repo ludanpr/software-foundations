@@ -229,4 +229,176 @@ Proof.
   apply cons_eq with (l := l).
   rewrite -> H1''. symmetry. apply H2. Qed.
 
-(* *)
+(* The principle of disjointness says that two terms beginning with different constructors (like
+ * O and S, or true and false) can never be equal. This means that, any time we find ourselves
+ * in a context where we've assumed that two such terms are equal, we are justified in concluding
+ * anything we want, since the assumption is nonsensical.
+ *
+ * The [discriminate] tactic embodies this principle: It is used on a hypothesis involving an
+ * equality between different constructors, and it solves the current goal immediately.
+ *
+ * The following examples are instances of a logical principle known as the principle of explosion,
+ * which asserts that a contradictory hypothesis entails anything (even manifestly false things!).
+ *)
+Theorem discriminate_ex1 : forall (n m : nat),
+    false = true -> n = m.
+Proof.
+  intros n m contra.
+  discriminate contra. Qed.
+
+Theorem discriminate_ex2 : forall (n : nat),
+    S n = O -> 2 + 2 = 5.
+Proof.
+  intros n contra.
+  discriminate contra. Qed.
+
+
+Example discriminate_ex3 : forall (X : Type) (x y z : X) (l j : Poly.list X),
+    x :: y :: l = [] -> x = z.
+Proof.
+  intros X x y z l j contra.
+  discriminate contra. Qed.
+
+(* For a slightly more involved example, we can use discriminate to make a connection between the
+ * two different notions of equality (= and =?) on natural numbers.
+ *)
+Theorem eqb_0_1 : forall n,
+    0 =? n = true -> n = 0.
+Proof.
+  intros n.
+  destruct n as [| n'] eqn:E.
+  - (* n = O *)
+    intros H. reflexivity.
+  - (* n = S n' *)
+    intros H. simpl. discriminate H. Qed.
+
+(* The injectivity of constructors allows us to reason that forall (n m : nat), S n = S m -> n = m.
+ * The converse of this imṕlication is an instance of a more general fact about both constructors
+ * and functions, which we will find convenient in a few places below:
+ *)
+Theorem f_equal : forall (A B : Type) (f : A -> B) (x y : A),
+    x = y -> f x = f y.
+Proof.
+  intros A B f x y eq.
+  rewrite -> eq. reflexivity. Qed.
+
+Theorem eq_implies_succ_equal : forall (n m : nat),
+    n = m -> S n = S m.
+Proof.
+  intros n m eq.
+  apply f_equal. apply eq. Qed.
+
+(* There is also a tactic named `f_equal` that can prove such theorems directly. Given a goal of
+ * the form f a1 ... an = g b1 ... bn, the tactic f_equal will produce subgoals of the form
+ * f = g, a1 = b1, ..., an = bn. At the same time, any of these subgoals that are simple enough
+ * (e.g., immediately provable by reflexivity) will be automatically discharged by f_equal.
+ *)
+Theorem eq_implies_succ_equal' : forall (n m : nat),
+    n = m -> S n = S m.
+Proof.
+  intros n m eq. f_equal. apply eq. Qed.
+
+(*                             *)
+(* Using Tactics on Hypotheses *)
+(*                             *)
+
+(* By default, most tactics work on the goal formula and leave the context unchanged. However,
+ * most tactics also have a variant that performs a similar operation on a statement in the context.
+ *
+ * For example, the tactic [simpl in H] performs simplification on the hypothesis [H] in the context.
+ *)
+Theorem S_inj : forall (n m : nat) (b : bool),
+    ((S n) =? (S m)) = b -> (n =? m) = b.
+Proof.
+  intros n m b H.
+  simpl in H. apply H. Qed.
+
+(* Similarly, [apply L in H] matches some conditional statement [L] (of the form X -> Y, say) against
+ * a hypothesis [H] in the context. However, unlike ordinary [apply] (which rewrites a goal matching
+ * Y into a subgoal X), [apply L in H] matches [H] against X and, if successful, replaces it with Y.
+ *
+ * In other words, [apply L in H] gives us a form of "forward reasoning": given X -> Y and a hypothesis
+ * matching X, it produces a hypothesis matching Y.
+ *
+ * By contrast, [apply L] is "backward reasoning": it says that if we know X -> Y and we are trying
+ * to prove Y, it suffices to prove X.
+ *
+ * Forward reasoning starts from what is given (premises, previously proven theorems) and iteratively
+ * draws conclusions from them until the goal is reached. Backward reasoning starts from the goal and
+ * iteratively reasons about what would imply the goal, until premises or previously proven theorems
+ * are reached.
+ *)
+Theorem silly4 : forall (n m p q : nat),
+    (n = m -> p = q) -> m = n -> q = p.
+Proof.
+  intros n m p q EQ H.
+  symmetry in H. apply EQ in H.
+  symmetry. apply H. Qed.
+
+(*                                  *)
+(* Varying the Induction Hypothesis *)
+(*                                  *)
+
+(* Sometimes it is important to control the exact form of the induction hypothesis when carrying out
+ * inductive proofs in Coq. In particular, we somtimes need to be careful about which of the assumptions
+ * we move (using [intros]) from the goal to the context before invoking the [induction] tactic.
+ *
+ * For example, suppose we want to show that double is injective -- i.e., that it maps different
+ * arguments to different results:
+ *
+ *     Theorem double_injective: ∀ n m,
+ *       double n = double m → n = m.
+ *
+ * The way we start this proof is a bit delicate: if we begin it with
+ *
+ *     intros n. induction n.
+ *
+ * then all is well. But if we begin it with introducing both variables
+ *
+ *      intros n m. induction n.
+ *
+ * we get stuck in the middle of the inductive case...
+ *)
+Theorem double_injective_FAILED : forall n m,
+    double n = double m -> n = m.
+Proof.
+  intros n m. induction n as [| n' IHn'].
+  - (* n = O *)
+    simpl. intros eq. destruct m as [| m'] eqn:E.
+    + (* m = O *)
+      reflexivity.
+    + (* m = S m' *)
+      discriminate eq.
+  - (* n = S n' *)
+    intros eq. destruct m as [| m'] eqn:E.
+    + (* m = O *)
+      discriminate eq.
+    + (* m = S m' *)
+      apply f_equal.
+      (* At this point, the induction hypotesis (IHn') does not give us n' = m' --
+       * there is an extra S in the way -- so the goal is not provable.
+       *
+       * The problem is that, at the point we invoke the induction hypothesis, we
+       * have already introduced m into the context.
+       *)
+      Abort.
+
+(* Trying to carry out this proof by induction on n when m is already in the context doesn't work
+ * because we are then trying to prove a statement involving every n but just a single m. A successful
+ * proof of double_injective leaves m universally quantified in the goal statement at the point
+ * where the induction tactic is invoked on n:
+ *)
+Theorem double_injective : forall n m,
+    double n = double m -> n = m.
+Proof.
+  intros n. induction n as [| n' IHn'].
+  - simpl. intros m eq. destruct m as [| m'] eqn:E.
+    + reflexivity.
+    + discriminate eq.
+  - simpl. intros m eq. destruct m as [| m'] eqn:E.
+    + discriminate eq.
+    + apply f_equal. apply IHn'. (* apply in universally quantified conditional *)
+      simpl in eq. injection eq as eq'. apply eq'. Qed.
+
+
+
