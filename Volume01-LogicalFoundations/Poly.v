@@ -3,7 +3,6 @@
  *)
 Set Warnings "-notation-overridden,-parsing,-deprecated-hint-without-locality".
 From LF Require Export Lists.
-Import Datatypes.
 
 (* Coq supports polymorphic inductive type definitions.
  *

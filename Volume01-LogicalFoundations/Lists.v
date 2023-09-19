@@ -188,8 +188,8 @@ Fixpoint oddmembers (l : natlist) : natlist :=
   match l with
     | nil => nil
     | h :: t => match (odd h) with
-                  | Datatypes.true => h :: (oddmembers t)
-                  | Datatypes.false => oddmembers t
+                  | true => h :: (oddmembers t)
+                  | false => oddmembers t
                 end
   end.
 
@@ -242,8 +242,8 @@ Fixpoint count (v : nat) (s : bag) : nat :=
   match s with
     | nil => O
     | h :: t => match v =? h with
-                  | Datatypes.true => 1 + (count v t)
-                  | Datatypes.false => count v t
+                  | true => 1 + (count v t)
+                  | false => count v t
                 end
   end.
 
@@ -323,7 +323,7 @@ Theorem add_inc_count: forall (v : nat) (s : bag),
     count v (add v s) = (count v s) + 1.
 Proof.
   intros v s.
-  assert (H: v =? v = Datatypes.true).
+  assert (H: v =? v = true).
   { induction v as [|v' IHv'].
     simpl. reflexivity.
     simpl. rewrite -> IHv'. reflexivity. }
@@ -566,7 +566,7 @@ Fixpoint eqblist (l1 l2 : natlist) : bool :=
     | nil, _ => false
     | _, nil => false
     | h1 :: t1, h2 :: t2 => match h1 =? h2 with
-                              | Datatypes.false => false
+                              | false => false
                               | _ => eqblist t1 t2
                             end
   end.
@@ -590,12 +590,12 @@ Proof.
 
 
 Theorem count_member_nonzero: forall (s : bag),
-    1 <=? (count 1 (1 :: s)) = Datatypes.true.
+    1 <=? (count 1 (1 :: s)) = true.
 Proof.
   simpl. reflexivity. Qed.
 
 Theorem leb_n_Sn: forall n,
-    n <=? (S n) = Datatypes.true.
+    n <=? (S n) = true.
 Proof.
   intros n. induction n as [| n' IHn'].
   - (* n = O *)
@@ -604,7 +604,7 @@ Proof.
     simpl. rewrite -> IHn'. reflexivity. Qed.
 
 Theorem remove_does_not_increase_count: forall (s : bag),
-    (count 0 (remove_one 0 s)) <=? (count 0 s) = Datatypes.true.
+    (count 0 (remove_one 0 s)) <=? (count 0 s) = true.
 Proof.
   intros s. induction s as [| n s' IHs'].
   - (* s = nil *)
@@ -706,7 +706,7 @@ Definition eqb_id (x1 x2 : id) :=
   end.
 
 Theorem eqb_id_refl: forall x,
-    eqb_id x x = Datatypes.true.
+    eqb_id x x = true.
 Proof.
   intros x. destruct x.
   simpl. rewrite -> eqb_refl. reflexivity. Qed.
@@ -743,7 +743,7 @@ Proof.
   simpl. rewrite -> eqb_id_refl. reflexivity. Qed.
 
 Theorem update_neq: forall (d : partial_map) (x y : id) (o : nat),
-    eqb_id x y = Datatypes.false -> find x (update d y o) = find x d.
+    eqb_id x y = false -> find x (update d y o) = find x d.
 Proof.
   intros d x y o H.
   simpl. rewrite -> H. reflexivity. Qed.

@@ -4,7 +4,7 @@
  *)
 Set Warnings "-notation-overridden,-parsing,-deprecated-hint-without-locality".
 From LF Require Export Poly.
-Import Datatypes.
+(* Import Datatypes. *)
 
 (* The apply tactic
  *
@@ -53,11 +53,11 @@ Theorem silly_ex : forall p,
     even p = true -> odd (S p) = true.
 Proof.
   intros p eq1 eq2 eq3.
-  (* `even n = false` added to subgoals, variables in conclusion matched with current goal
-   * `odd (S p) = true` turns into subgoal `even (S p) = false` *)
+  (* `even n = false` added to subgoals, variables in conclusion matched with current goal *)
+(*    * `odd (S p) = true` turns into subgoal `even (S p) = false` *)
   apply eq2.
-  (* `even n = true` added to subgoals, variables matched with current subgoal
-   * `even (S p) = false` turns into subgoal `even p = true` *)
+  (* `even n = true` added to subgoals, variables matched with current subgoal *)
+(*    * `even (S p) = false` turns into subgoal `even p = true` *)
   apply eq1.
   (* apply premise `even p = true` *)
   apply eq3. Qed.
@@ -78,7 +78,7 @@ Proof.
 (* TODO: fix
  * Error: The reference _ was not found in the current environment.
  *)
-Theorem rev_injective': forall X (l1 l2 : Poly.list X),
+Theorem rev_injective': forall X (l1 l2 : list X),
     rev l1 = rev l2 -> l1 = l2.
 Proof.
   intros X l1 l2 H.
@@ -88,7 +88,7 @@ Proof.
   rewrite -> rev_involutive. reflexivity. Qed.
 (* We can use [apply] with previously defined theorems, not just hypotheses in the context.
  *)
-Theorem rev_exercise1 : forall X (l l' : Poly.list X),
+Theorem rev_exercise1 : forall X (l l' : list X),
     l = rev l' -> l' = rev l.
 Proof.
   intros X l l' H.
@@ -215,13 +215,13 @@ Proof.
   rewrite -> H1. rewrite -> H2.
   reflexivity. Qed.
 
-Lemma cons_eq : forall (X : Type) (x y : X) (l : Poly.list X),
+Lemma cons_eq : forall (X : Type) (x y : X) (l : list X),
     x :: l = y :: l -> x = y.
 Proof.
   intros X x y l H.
   injection H as H'. apply H'. Qed.
 
-Example injection_ex3 : forall (X : Type) (x y z : X) (l j : Poly.list X),
+Example injection_ex3 : forall (X : Type) (x y z : X) (l j : list X),
     x :: y :: l = z :: j -> j = z :: l -> x = y.
 Proof.
   intros X x y z l j H1 H2.
@@ -253,7 +253,7 @@ Proof.
   discriminate contra. Qed.
 
 
-Example discriminate_ex3 : forall (X : Type) (x y z : X) (l j : Poly.list X),
+Example discriminate_ex3 : forall (X : Type) (x y z : X) (l j : list X),
     x :: y :: l = [] -> x = z.
 Proof.
   intros X x y z l j contra.
@@ -400,5 +400,97 @@ Proof.
     + apply f_equal. apply IHn'. (* apply in universally quantified conditional *)
       simpl in eq. injection eq as eq'. apply eq'. Qed.
 
+
+Theorem eqb_true : forall n m,
+    n =? m = true -> n = m.
+Proof.
+  intros n. induction n as [| n' IHn'].
+  - intros m eq. destruct m as [| m'] eqn:E.
+    + reflexivity.
+    + discriminate eq.
+  - intros m eq. destruct m as [| m'] eqn:E.
+    + discriminate eq.
+    + simpl in eq. f_equal. apply IHn'. apply eq. Qed.
+
+Theorem plus_n_n_injective : forall n m,
+    n + n = m + m -> n = m.
+Proof.
+  intros n. induction n as [| n' IHn'].
+  - intros m eq. destruct m as [| m'] eqn:E.
+    + reflexivity.
+    + simpl in eq. discriminate eq.
+  - intros m eq. destruct m as [| m'] eqn:E.
+    + simpl in eq. discriminate eq.
+    + simpl in eq. injection eq as eq'.
+      rewrite <- plus_n_Sm in eq'.
+      symmetry in eq'.
+      rewrite <- plus_n_Sm in eq'.
+      symmetry in eq'.
+      injection eq' as eq''. apply IHn' in eq''.
+      f_equal. apply eq''. Qed.
+
+(* The strategy of doing fewer [intros] before an [induction] to obtain a more general IH
+ * doesn't always work by itself; sometimes some rearrangement of quantified variables is
+ * needed.
+ *
+ * Suppose, for example, that we wanted to prove double_injective by induction on m instead
+ * of n. In the following theorem, we get stuck again. The problem is that, to do induction
+ * on m, we must first introduce n. (And if we simply say induction m without introducing
+ * anything first, Coq will automatically introduce n for us!).
+ *)
+Theorem double_injective_take2_FAILED : forall n m,
+    double n = double m -> n = m.
+Proof.
+  intros n m. induction m as [| m' IHm'].
+  - (* m = O *)
+    simpl. intros eq. destruct n as [| n'] eqn:E.
+    + (* n = O *)
+      reflexivity.
+    + (* n = S n' *)
+      discriminate eq.
+  - (* m = S m' *)
+    intros eq. destruct n as [| n'] eqn:E.
+    + (* n = O *)
+      discriminate eq.
+    + (* n = S n' *)
+      apply f_equal.
+      Abort.
+
+(* What can we do about this? One possibility is to rewrite the statement of the lemma so
+ * that m is quantified before n. This works, but it's not nice: We don't want to have to
+ * twist the statements of lemmas to fit the needs of a particular strategy for proving
+ * them! Rather we want to state them in the clearest and most natural way.
+ *
+ * What we can do instead is to first introduce all the quantified variables and then
+ * re-generalize one or more of them, selectively taking variables out of the context and
+ * putting them back at the beginning of the goal. The [generalize dependent] tactic does this.
+ *)
+Theorem double_injective_take2 : forall n m,
+    double n = double m -> n = m.
+Proof.
+  intros n m.              (* `n` and `m` are both in the context *)
+  generalize dependent n.  (* Now `n` is back in the goal and we can do induction
+                              on `m` and get a sufficiently general IH *)
+  induction m as [| m' IHm'].
+  - simpl. intros n eq. destruct n as [| n'] eqn:E.
+    + reflexivity.
+    + discriminate eq.
+  - intros n eq. destruct n as [| n'] eqn:E.
+    + discriminate eq.
+    + apply f_equal. apply IHm'. injection eq as eq'. apply eq'. Qed.
+
+
+Theorem nth_error_after_last : forall (n : nat) (X : Type) (l : list X),
+    length l = n -> nth_error l n = None.
+Proof.
+  intros n X l.
+  generalize dependent n.
+  induction l as [| h l' IHl'].
+  - intros n eq. destruct n as [| n'] eqn:E.
+    + reflexivity.
+    + simpl in eq. discriminate eq.
+  - intros n eq. destruct n as [| n'] eqn:E.
+    + simpl in eq. discriminate eq.
+    + simpl in eq. simpl. injection eq as eq'. apply IHl'. apply eq'. Qed.
 
 

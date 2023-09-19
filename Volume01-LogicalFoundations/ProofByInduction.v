@@ -197,7 +197,7 @@ Proof.
 Qed.
 
 Theorem eqb_refl: forall n : nat,
-    (n =? n) = Datatypes.true.
+    (n =? n) = true.
 Proof.
   induction n as [|n' IHn'].
   simpl. reflexivity.

@@ -1,3 +1,4 @@
+From LF Require Export Booleans.
 Module NatPlayground.
 
 (* There is a representation of numbers that is even simpler than binary,
