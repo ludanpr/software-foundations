@@ -265,10 +265,31 @@ Proof.
   rewrite -> add_assoc. reflexivity.
 Qed.
 
+Lemma mult_n_1_plus_k : forall n k : nat,
+    n * (1 + k) = n + n * k.
+Proof.
+  intros n k. induction n as [| n' IHn'].
+  - reflexivity.
+  - rewrite <- mult_n_Sm. rewrite -> add_comm. reflexivity. Qed.
+
 Theorem mul_comm: forall m n : nat,
     m * n = n * m.
 Proof.
   intros n m.
-  destruct m as [|m'].
+  induction m as [| m' IHm'].
   - simpl. rewrite -> mul_0_r. reflexivity.
-  - Abort.
+  - simpl. rewrite -> mult_n_1_plus_k. rewrite -> IHm'. reflexivity. Qed.
+
+Theorem mult_plus_distr_r : forall n m p : nat,
+  (n + m) * p = (n * p) + (m * p).
+Proof.
+  intros n m p. induction n as [| n' IHn'].
+  - reflexivity.
+  - simpl. rewrite -> IHn'. rewrite -> add_assoc. reflexivity. Qed.
+
+Theorem mult_assoc : forall n m p : nat,
+    n * (m * p) = (n * m) * p.
+Proof.
+  intros n m p. induction n as [| n' IHn'].
+  - reflexivity.
+  - simpl. rewrite -> IHn'. rewrite -> mult_plus_distr_r. reflexivity. Qed.

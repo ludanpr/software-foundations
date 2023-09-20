@@ -4,7 +4,6 @@
  *)
 Set Warnings "-notation-overridden,-parsing,-deprecated-hint-without-locality".
 From LF Require Export Poly.
-(* Import Datatypes. *)
 
 (* The apply tactic
  *
@@ -492,5 +491,33 @@ Proof.
   - intros n eq. destruct n as [| n'] eqn:E.
     + simpl in eq. discriminate eq.
     + simpl in eq. simpl. injection eq as eq'. apply IHl'. apply eq'. Qed.
+
+(*                       *)
+(* Unfolding Definitions *)
+(*                       *)
+
+(* It sometimes happens that we need to manually unfold a name that has been introduced by
+ * a [Definition] so that we can manipulate the expression it denotes. For example, if we
+ * define `square` and try to prove a simple fact about it...
+ *)
+Definition square n := n * n.
+
+Lemma square_mult_FAIL : forall n m,
+    square (n * m) = square n * square m.
+Proof.
+  intros n m.
+  (* ...we appear to be stuck: [simpl] doesn't simplify anything *)
+  simpl. Abort.
+
+(* To make progress, we can manually `unfold` the definition of `square`: *)
+Lemma square_mult : forall n m,
+    square (n * m) = square n * square m.
+Proof.
+  intros n m.
+  unfold square.
+  rewrite -> mult_assoc.
+  assert (H: n * m * n = n * n * m).
+  { rewrite -> mul_comm. rewrite -> mult_assoc. reflexivity. }
+  rewrite -> H. rewrite -> mult_assoc. reflexivity. Qed.
 
 
