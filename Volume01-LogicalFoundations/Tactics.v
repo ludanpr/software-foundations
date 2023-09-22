@@ -520,4 +520,116 @@ Proof.
   { rewrite -> mul_comm. rewrite -> mult_assoc. reflexivity. }
   rewrite -> H. rewrite -> mult_assoc. reflexivity. Qed.
 
+(* At this point, some deeper discussion of unfolding and simplification is in order. We
+ * already have observed that tactics like simpl, reflexivity, and apply will often unfold
+ * the definitions of functions automatically when this allows them to make progress.
+ * For example, if we define foo m to be the constant 5...
+ *)
+Definition foo (x : nat) := 5.
+(* ... then the [simpl] in the following proof (of the [reflexivity], if we omit the [simpl])
+ * will unfold `foo m` to `(fun x => 5) m` and further simplify this expression to just `5`
+ *)
+Fact silly_fact_1 : forall m,
+    foo m + 1 = foo (m + 1) + 1.
+Proof.
+  intros m.
+  simpl.
+  reflexivity. Qed.
+
+(* But this automatic unfolding is somewhat convervative. For example, if we define a slightly
+ * more complicated function involving a pattern match...
+ *)
+Definition bar x :=
+  match x with
+  | O => 5
+  | S _ => 5
+  end.
+(* ...then the analogous proof will get stuck: *)
+Fact silly_fact_2_FAILED : forall m,
+    bar m + 1 = bar (m + 1) + 1.
+Proof.
+  intros m.
+  simpl. (* does nothing *)
+  Abort.
+
+(* The reason that [simpl] doesn't make progress here is that it notices that, after tentatively
+ * unfolding `bar m`, it is left with a match whose scrutinee, `m`, is a variable, so the `match`
+ * cannot be simplified further. It is not smart enough to notice that the two branches of the
+ * `match` are identical, so it gives up on unfolding `bar m` and leaves it alone.
+ *
+ * Similarly, tentatively unfolding bar (m+1) leaves a match whose scrutinee is a function application
+ * (that cannot itself be simplified, even after unfolding the definition of +), so simpl leaves it
+ * alone.
+ *
+ * At this point, there are two ways to make progress. One is to use destruct m to break the proof
+ * into two cases, each focusing on a more concrete choice of m (O vs S _). In each case, the match
+ * inside of bar can now make progress, and the proof is easy to complete.
+ *)
+Fact silly_fact_2 : forall m,
+    bar m + 1 = bar (m + 1) + 1.
+Proof.
+  intros m. destruct m as [| m'] eqn:E.
+  - simpl. reflexivity.
+  - simpl. reflexivity. Qed.
+
+(* This approach works, but it depends on our recognizing that the `match` hidden inside `bar` is
+ * what was preventing us from making progress.
+ *
+ * A more straightforward way forward is to explicitly tell Coq to unfold `bar`:
+ *)
+Fact silly_fact_2' : forall m,
+    bar m + 1 = bar (m + 1) + 1.
+Proof.
+  intros m.
+  unfold bar.
+  destruct m as [| m'] eqn:E.
+  - reflexivity.
+  - reflexivity. Qed.
+
+(*                                        *)
+(* Using destruct on Compound Expressions *)
+(*                                        *)
+
+(* We have seen many examples where [destruct] is used to perform case analysis of the value of
+ * some variable. Sometimes we need to reason by cases on the result of some expression. We can
+ * also do this with [destruct].
+ *
+ * After unfolding sillyfun in the above proof, we find that we are stuck on
+ *
+ *      if (n =? 3) then ... else ....
+ *
+ * But either n is equal to 3 or it isn't, so we can use destruct (eqb n 3) to let us reason about
+ * the two cases.
+ *
+ * In general, the destruct tactic can be used to perform case analysis of the results of arbitrary
+ * computations. If e is an expression whose type is some inductively defined type T, then, for each
+ * constructor c of T, `destruct e` generates a subgoal in which all occurrences of e (in the goal
+ * and in the context) are replaced by c.
+ *)
+Definition sillyfun (n : nat) : bool :=
+  if n =? 3 then false
+  else if n =? 5 then false
+  else false.
+
+Theorem sillyfun_false : forall (n : nat),
+    sillyfun n = false.
+Proof.
+  intros n. unfold sillyfun.
+  destruct (n =? 3) eqn:E1.
+  - (* n =? 3 = true *)
+    reflexivity.
+  - (* n =? 3 = false *)
+    destruct (n =? 5) eqn:E2.
+    + reflexivity.
+    + reflexivity. Qed.
+
+Theorem combine_split : forall X Y (l : list (X * Y)) l1 l2,
+    split l = (l1, l2) -> combine l1 l2 = l.
+Proof.
+  intros X Y l l1 l2.
+  unfold split.
+  induction l as [| (x,y) l' IHl'].
+  - intros eq. injection eq as eq' eq''. rewrite <- eq'. reflexivity.
+  - Show. Abort.
+
 
