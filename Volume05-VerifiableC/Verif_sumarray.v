@@ -389,7 +389,151 @@ Proof.
 
   (** Proving that the loop body preserves the loop invariant
 
-   
+   The third subgoal of [forward_while] is to prove that the loop body preserves the loop invariant.
+   We must forward-symbolic-execute through the loop body.
+
+   The first C command in the loop body is the array subscript, `x = a[i];`. In order to prove this
+   statement, the forward tactic needs to be able to prove that i is within bounds of the array. When
+   we try forward, it fails.
    *)
   - hint.
+  Fail forward.   (* x = a[i] *)
+  (* [forward] fails and tells us to first make `0 ≤ i < Zlength contents` provable. This auxiliary fact
+   will help it prove that the array subscript i is within the bounds of the array a. It asks us to assert
+   and prove some fact strong enough to imply this.
 
+   Above the line we have 0<=i and i<size, so if we could prove Zlength contents = size that would be enough.
+   Unfortunately, it won't work to do assert (Zlength contents = size) because there is not enough information
+   above the line to prove that.
+
+   The required information to prove `Zlength contents = size` comes from the precondition of the current
+   semax goal. In the precondition, we have
+
+         data_at sh (tarray tuint size) (map Vint (map Int.repr contents)) a
+
+   The data_at predicate always enforces that the "contents" list for an array is exactly the same length as
+   the size of the array. To make use of precondition facts in an assertion, use assert_PROP.
+
+   The proof goal is an entailment, with the current precondition on the left, and the proposition to be proved
+   on the right. As usual, to prove an entailment, we use the [entailer!] tactic to simplify the proof goal.
+
+   Indeed, [entailer!] has done almost all the work. If you want to see how [entailer!] did it, undo the last step
+   and use these two tactics: [go_lower]. [saturate_local]. The job of [go_lower] is to process the `PROP` and
+   `LOCAL` parts of the entailment; and [saturate_local] derives all the propositional facts derivable from the
+   mpreds on the left-hand-side, and puts those facts above the line. In this case, above the line is,
+
+         Zlength (unfold_reptype (map Vint (map Int.repr contents))) = size
+
+   which is the fact we need.
+   *)
+  assert_PROP (Zlength contents = size). {
+    entailer!.
+    (* The hint suggests that list_solve solves this goal,
+
+         Zlength contents = Zlength (map Vint (map Int.repr contents)).
+
+     Indeed, [list_solve] knows a lot of things about the interaction of list operators: Zlength, map, sublist, etc.
+
+     Or, we can solve the goal "by hand".
+     *)
+    hint.
+    do 2 rewrite Zlength_map. reflexivity.
+  }
+  hint.
+
+  (* Now that we have `Zlength contents = size` above the line, we can go [forward] through the array-subscript
+   statement; then [forward] through the rest of the loop body.
+   *)
+  forward.    (* x = a[i]; *)
+  forward.    (* s += x; *)
+  forward.    (* i++; *)
+  (* We have reached the end of the loop body, and it's time to prove that the current precondition (which is the
+   postcondition of the loop body) entails the loop invariant.
+   *)
+  Exists (i+1).
+  entailer!.
+  f_equal.
+  f_equal.
+  (* Here the proof goal is,
+
+          sum_Z (sublist 0 (i + 1) contents) =
+                      sum_Z (sublist 0 i contents) + Znth i contents
+
+   We will prove this in stages:
+
+          sum_Z (sublist 0 (i + 1) contents) =
+          sum_Z (sublist 0 i contents ++ sublist i (i+1) contents) =
+          sum_Z (sublist 0 i contents) + sum_Z (sublist i (i+1) contents) =
+          sum_Z (sublist 0 i contents) + sum_Z (Znth i contents :: nil) =
+          sum_Z (sublist 0 i contents) + Znth i contents
+   *)
+  rewrite (sublist_split 0 i (i+1)) by lia.
+  rewrite sum_Z_app.
+  rewrite (sublist_one i) by lia.
+  simpl. lia.
+  (* After the loop, our precondition is the conjunction of the loop invariant and the negation of the loop test.
+   *)
+  - hint.
+  (* We can always go [forward] through a `return` statement. The resulting proof goal is an entailment, that the
+   current precondition implies the function's postcondition.
+   *)
+  forward.     (* return s; *)
+  (* Here we prove that the postcondition of the function body entails the postcondition demanded by the function
+   specification
+   *)
+  entailer!.
+  hint.
+  autorewrite with sublist in *|-.
+  hint.
+  autorewrite with sublist.
+  reflexivity. Qed.
+
+(** Global variables and main
+
+ C programs may have extern global variables, either with explicit initializers or implicitly initialized to zero.
+ Because they live in memory, they need to be described by a separation logic predicate, a "resource" that gets
+ passed from one function to another via the SEP part of funspec preconditions and postconditions. Initially, all
+ the global-variable resources are passed into the main function, as its precondition. The built-in operator
+ main_pre calculates this precondition of main by examining all the global declarations of the program.
+ *)
+Definition four_contents := [1;2;3;4].
+
+Lemma body_main : semax_body Vprog Gprog f_main main_spec.
+Proof.
+  start_function.
+  (* We are ready to prove the function-call, `s = sumarray(four, 4);` We use the [forward_call] tactic,
+   and for the argument we must supply a tuple of values that instantiates the `WITH` clause of the called
+   function's funspec. In `DECLARE _sumarray`, the `WITH` clause reads,
+
+        WITH a: val, sh: share, contents: list Z, size: Z
+
+   Therefore the argument to [forward_call] must be a four-tuple of type, `(val * share * list Z * Z)`
+   *)
+  forward_call (gv _four, Ews, four_contents, 4).    (* s = sumarray(four, 4); *)
+  (* The subgoal of [forward_call] is that we have to prove the `PROP` part of the `sumarray` function's
+   precondition
+   *)
+  repeat constructor; computable.
+  (* Now we are after the function call, and we can go forward through the return statement. *)
+  forward. Qed.
+
+(** Tying all the functions together
+
+ The C program do input/output, affecting the state of the outside world. This state is described (abstractly)
+ by the [Espec], the "external specification". The `sumarray` program does not do any input/output, so we can
+ use a trivial [Espec].
+ *)
+#[export] Existing Instance NullExtension.Espec.
+(* An entire C program is proved correct if all the functions satisfy their funspecs. We listed all those
+ functions (upon whose specifications we depend) in the `Gprog` definition. The judgment
+
+      semax_prog prog Vprog Gprog
+
+ says, "In the program prog, whose varspecs are Vprog and whose funspecs are Gprog, every function mentioned
+ in Gprog does satisfy its specification."
+ *)
+Lemma prog_correct : semax_prog prog tt Vprog Gprog.
+Proof.
+  prove_semax_prog.
+  semax_func_cons body_sumarray.
+  semax_func_cons body_main. Qed.
