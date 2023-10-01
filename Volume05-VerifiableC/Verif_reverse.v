@@ -2,7 +2,7 @@
 
  To generate the program AST:
 
-    clighgen -normalize reverse.c
+    clightgen -normalize reverse.c
 
  *)
 Require VC.Preface.
@@ -190,5 +190,144 @@ Proof.
 
 (** Valid pointers, and the [valid_pointer] Hint database
 
- 
+ In the C language, you can do a pointer comparison such as `p != NULL` or `p == q` only if `p` is a
+ valid pointer, that is, either `NULL` or actually pointing within an allocated object. One way to
+ prove that `p` is valid is if, for example, `data_at Tsh t_list (h,y) p`, meaning that `p` is pointing
+ at a list cell. There is a hint database [valid_pointer] from which the predicate `valid_pointer p` can
+ be proved automatically.
  *)
+Lemma struct_list_valid_pointer_example : forall h y p,
+    data_at Tsh t_list (h,y) p |-- valid_pointer p.
+Proof.
+  intros.
+  auto with valid_pointer. Qed.
+
+(* However, the hint database does not know about user-defined separation-logic predicates (`mpred`)
+ such as `listrep`:
+ *)
+Lemma listrep_valid_pointer_example : forall sigma p,
+    listrep sigma p |-- valid_pointer p.
+Proof.
+  intros.
+  (* In this case, `auto with...` would not solve the proof goal. *)
+  auto with valid_pointer.
+  Abort.
+
+(* Therefore, we should prove the appropriate lemma, and add it to the hint database.
+ *)
+Lemma listrep_valid_pointer : forall sigma p,
+    listrep sigma p |-- valid_pointer p.
+Proof.
+  intros.
+  unfold listrep.
+  (* Now we can do case analysis on `sigma` *)
+  destruct sigma; simpl.
+  - (* sigma = nil *)
+    hint.
+    entailer!.
+  - (* sigma = cons a sigma' *)
+    Intros y.
+    (* Now this solves using the Hint database [valid_pointer], because the
+     `data_at Tsh t_list (v,y) p` on the left is enough to prove the goal.
+     *)
+    auto with valid_pointer. Qed.
+
+(*  Now we add this lemma to the Hint database *)
+#[export] Hint Resolve listrep_valid_pointer : valid_pointer.
+
+
+(** Specification of the reverse function
+
+ A `funspec` characterizes the precondition required for calling the function and the postcondition
+ guaranteed by the function.
+
+ - The `WITH` clause says, there is a value `sigma: list val` and a value `p: val`, visible in both
+   the precondition and the postcondition.
+ - The PREcondition says,
+       + There is one function-parameter, whose C type is "pointer to struct list"
+       + PARAMS: The parameter contains the Coq value `p`
+       + SEP: in memory at address `p` there is a linked list representing `sigma`.
+ - The POSTcondition says,
+       + the function returns a value whose C type is "pointer to struct list"; and
+       + there exists a value `q : val`, such that
+       + RETURN: the function's return value is `q`
+       + SEP: in memory at address `q` there is a linked list representing `rev sigma`.
+ *)
+Definition reverse_spec : ident * funspec :=
+ DECLARE _reverse
+  WITH sigma : list val, p : val
+  PRE [ tptr t_list ]
+     PROP () PARAMS (p) SEP (listrep sigma p)
+  POST [ (tptr t_list) ]
+    EX q:val,
+     PROP () RETURN (q) SEP (listrep(rev sigma) q).
+
+(* The global function spec characterizes the preconditions/postconditions of all the functions that
+ your proved-correct program will call. Normally you include all the functions here, but in this
+ tutorial example we include only one.
+ *)
+Definition Gprog : funspecs := [ reverse_spec ].
+
+(** Proof of the `reverse` function
+
+ For each function definition in the C program, prove that the function-body (in this case, f_reverse)
+ satisfies its specification (in this case, `reverse_spec`).
+ *)
+Lemma body_reverse : semax_body Vprog Gprog f_reverse reverse_spec.
+Proof.
+  start_function.
+  (* As usual, the current assertion (precondition) is derived from the `PRE`
+   clause of the function specification, `reverse_spec`, and the current command
+   `w = 0; ... more ...` is the function body of `f_reverse`
+   *)
+  Show. forward.  (* w = NULL; *)
+  (* The new `semax` judgement is for the rest of the function body after the
+   command `w = NULL`. The precondition of this `semax` is actually the postcondition
+   of the `w = NULL`, but contains the additional `LOCAL` fact,
+
+           temp _w (Vint (Int.repr 0))
+
+   , that is, the variable `_w` contains `nullval`.
+   *)
+  forward.  (* v = p; *)
+  (* We cannot take the next step using forward because the next command is a while loop.
+   *)
+  (** The loop invariant
+
+   To prove a while-loop, we must supply a loop invariant, such as
+
+         (EX s1 ... PROP (...) LOCAL (...) SEP (...).
+   *)
+  forward_while
+    (EX s1 : list val, EX s2 : list val,
+     EX w : val, EX v : val,
+      PROP (sigma = rev s1 ++ s2)
+      LOCAL (temp _w w; temp _v v)
+      SEP (listrep s1 w; listrep s2 v)).
+  (* The forward_while tactic leaves four subgoals, which we mark with - (the Coq "bullet")
+   *)
+  - (* Prove that (current) precondition implies the loop invariant. *)
+    hint.
+    (* On the left-hand side of this entailment is the precondition (that we had already
+     established by forward symbolic execution to this point) for the entire while-loop.
+     On the right-hand side is the loop invariant, that we just gave to the [forward_while]
+     tactic. Because the right-hand side has four existentials, a good proof strategy is
+     to choose values for them, using the Exists tactic.
+     *)
+    Exists (@nil val) sigma nullval p.
+    (* Now we have a quantifier-free proof goal; let us see whether entailer! can solve some
+     parts of it.
+     *)
+    entailer!.
+    unfold listrep.
+    (* Now that the user-defined predicate is unfolded, entailer! can solve the residual
+     entailment.
+     *)
+    entailer!.
+  - (* Prove that loop invariant implies typechecking of loop condition *)
+    hint.
+    (* The second subgoal of [forward_while] is to prove that the loop-test condition can
+     execute 
+     *)
+    Show. Abort.
+
