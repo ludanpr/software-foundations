@@ -623,13 +623,124 @@ Proof.
     + reflexivity.
     + reflexivity. Qed.
 
+
 Theorem combine_split : forall X Y (l : list (X * Y)) l1 l2,
     split l = (l1, l2) -> combine l1 l2 = l.
 Proof.
   intros X Y l l1 l2.
   unfold split.
-  induction l as [| (x,y) l' IHl'].
-  - intros eq. injection eq as eq' eq''. rewrite <- eq'. reflexivity.
-  - Show. Abort.
+  induction l as [| h l' IHl'].
+  - intros eq. injection eq as eq' eq''.
+    rewrite <- eq'. rewrite <- eq''. reflexivity.
+  - intros eq. destruct (h :: l') eqn:E.
+    + discriminate E.
+    + Abort.
 
+(* The `eqn` part of the `destruct` tactic is optional. However, when destructing compound expressions,
+ the information recorded by the `eqn:` can actually be critical.
+ *)
+Definition sillyfun1 (n : nat) : bool :=
+  if n =? 3 then true
+  else if n =? 5 then true
+  else false.
+
+(* Now suppose that we want to convince Coq that `sillyfun1 n` yields `true` only when `n` is odd. If we
+ start the proof like this (with no `eqn:` on the `destruct`)...
+ *)
+Theorem sillyfun1_odd_FAILED : forall (n : nat),
+    sillyfun1 n = true -> odd n = true.
+Proof.
+  intros n eq. unfold sillyfun1 in eq.
+  destruct (n =? 3).
+  (* stuck... *)
+Abort.
+(* ... then we are stuck at this point because the context does not contain enough information to prove the
+ goal! The problem is that the substitution performed by `destruct` is quite brutal -- in this case, it throws
+ away every occurrence of `n =? 3`, but we need to keep some memory of this expression and how it was destructed,
+ because we need to be able to reason that, since we are assuming `n =? 3 = true` in this branch of the case
+ analysis, it must be that `n = 3`, from which it follows that `n` is odd.
+
+ What we want here is to substitute away all existing occurrences of `n =? 3`, but at the same time add an
+ equation to the context that records which case we are in.
+ *)
+Theorem sillyfun1_odd : forall (n : nat),
+    sillyfun1 n = true -> odd n = true.
+Proof.
+  intros n eq. unfold sillyfun1 in eq.
+  destruct (n =? 3) eqn:Heqe3.
+  - (* e3 = true *)
+    apply eqb_true in Heqe3.
+    rewrite -> Heqe3. reflexivity.
+  - (* e3 = false *)
+    destruct (n =? 5) eqn:Heqe5.
+    + (* e5 = true *)
+      apply eqb_true in Heqe5.
+      rewrite -> Heqe5. reflexivity.
+    + (* e5 = false *)
+      discriminate eq. Qed.
+
+Theorem bool_fn_applied_thrice : forall (f : bool -> bool) (b : bool),
+    f (f (f b)) = f b.
+Proof.
+  intros f b.
+  destruct b eqn:HE1.
+  - destruct (f true) eqn:HE2.
+    + rewrite HE2. apply HE2.
+    + destruct (f false) eqn:HE3.
+      * apply HE2.
+      * apply HE3.
+  - destruct (f false) eqn:HE2.
+    + destruct (f true) eqn:HE3.
+      * apply HE3.
+      * apply HE2.
+    + rewrite HE2. apply HE2. Qed.
+
+(** Review
+
+ We've now seen many of Coq's most fundamental tactics. Here are the ones we've seen:
+
+ - [intros]: move hypothesis/variables from goal to context.
+ - [reflexivity]: finish the proof (when the goal looks like `e = e`
+ - [apply]: prove goal using a hypothesis, lemma, or constructor
+ - [apply ... in H]: apply a hypothesis, lemma, or constructor to a
+   hypothesis in the context (forward reasoning)
+ - [apply ... with ...]: explicitly specify values for variables that
+   cannot be determined by pattern matching
+ - [simpl]: simplify computations in general
+ - [simpl in H]: ... or a hypothesis
+ - [rewrite]: use an equality hypothesis (or lemma) to rewrite the goal
+ - [rewrite ... in H]: ... or a hypothesis
+ - [symmetry]: changes a goal of the form `t = u` into `u = t`
+ - [symmetry in H]: changes a hypothesis of the form `t = u` into `u = t`
+ - [transitivity y]: prove a goal `x = z` by proving two new subgoals,
+   `x = y` and `y = z`
+ - [unfold]: replace a defined constant by its right-hand side in the goal
+ - [unfold ... in H]: ... or a hypothesis
+ - [destruct ... as ...]: case analysis on values of inductively defined types
+ - [destruct ... eqn: ...]: specify the name of an equation to be added to
+   the context, recording the result of the case analysis
+ - [induction ... as ...]: induction on values of inductively defined types
+ - [injection ... as ...]: reason by injectivity on equalities between values
+   of inductively defined types
+ - [discriminate]: reason by disjointness of constructors on equalities between
+   values of inductively defined types
+ - [assert (H : e)] (or [assert (e) as H]): introduce a "local lemma" `e` and
+   call it `H`
+ - [generalize dependent x]: move the variable `x` (and anything else that depends
+   on it) from the context back to an explicit hypothesis in the goal formula
+ - [f_equal]: change a goal of the form `f x = f y` into `x = y`.
+ *)
+
+
+Theorem eqb_sym : forall (n m : nat),
+    (n =? m) = (m =? n).
+Proof.
+  intros n.
+  induction n as [|n' IHl'].
+  - intros m. destruct m as [|m'] eqn:Em.
+    + reflexivity.
+    + simpl. reflexivity.
+  - intros m. destruct m as [|m'] eqn:Em.
+    + simpl. reflexivity.
+    + apply IHl'. Qed.
 
