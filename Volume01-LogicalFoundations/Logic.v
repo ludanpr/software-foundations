@@ -191,5 +191,57 @@ Proof.
 
 (** Disjunction
 
+ Another important connective is the disjunction, or logical or, of two propositions: A \/ B is true when either `A`
+ or `B` is.
+
+ To use a disjunctive hypothesis in a proof, we proceed by case analysis -- which, as with other data types like `nat`,
+ can be done explicitly with [destruct] or implicitly with an [intros] pattern:
+ *)
+Lemma factor_is_O : forall n m : nat,
+    n = 0 \/ m = 0 -> n * m = 0.
+Proof.
+  (* This pattern implicitly does case analysis on `n = 0 \/ m = 0` *)
+  intros n m [Hn | Hm].
+  - (* n = 0 *)
+    rewrite Hn. reflexivity.
+  - (* m = 0 *)
+    rewrite mul_comm. rewrite Hm.
+    reflexivity. Qed.
+
+(* Conversely, to show that a disjunction holds, it suffices to show that one of its sides holds. This can be done via
+ the tactics [left] and [right]. As their names imply, the first one requires proving the left side of the disjunction,
+ while the second requires proving the right side.
+ *)
+Lemma or_intro_1 : forall A B : Prop,
+    A -> A \/ B.
+Proof.
+  intros A B HA.
+  left. apply HA. Qed.
+
+Lemma zero_or_succ : forall n : nat,
+    n = 0 \/ n = S (pred n).
+Proof.
+  intros [|n'].
+  - left. reflexivity.
+  - right. reflexivity. Qed.
+
+
+Lemma mult_is_O : forall n m,
+    n * m = 0 -> n = 0 \/ m = 0.
+Proof.
+  intros [|n'] m H.
+  - left. reflexivity.
+  - simpl in H. apply and_exercise in H.
+    right. apply H. Qed.
+
+Theorem or_commut : forall P Q : Prop,
+    P \/ Q -> Q \/ P.
+Proof.
+  intros P Q [| H].
+  - right. apply H.
+  - left. apply H. Qed.
+
+(** Falsehood and Negation
+
  
  *)
