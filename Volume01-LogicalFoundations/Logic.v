@@ -243,5 +243,271 @@ Proof.
 
 (** Falsehood and Negation
 
+ Up to this point, we have mostly been concerned with proving "positive" statements -- addition is commutative, appending
+ lists is associative, etc. Of course, we are sometimes also interested in negative results, demonstrating that some given
+ proposition is not true. Such statements are expressed with the logical negation operator ¬.
+
+ To see how negations work, recall the principle of explosion from the [Tactics] chapter, which asserts that, if we assume
+ a contradiction, then any other proposition can be derived.
+
+ Following this intuition, we could define ¬ P ("not P") as ∀ Q, P → Q.
+
+ Coq actually makes a slightly different but equivalent choice, defining ¬ P as P → False, where False is a specific un-
+ provable proposition defined in the standard library.
+ *)
+Check not : Prop -> Prop.
+
+(* Since `False` is a contradictory proposition, the principle of explosion also applies to it. If we can get `False` into
+ the context, we can use [destruct] on it to complete any goal:
+ *)
+Theorem ex_falso_quodlibet : forall (P : Prop),
+    False -> P.
+Proof.
+  intros P contra.
+  destruct contra. Qed.
+
+Theorem not_implies_our_not : forall (P : Prop),
+    ~ P -> (forall (Q : Prop), P -> Q).
+Proof.
+  intros P. unfold not.
+  intros contra Q HP.
+  apply contra in HP.
+  destruct HP. Qed.
+
+(* Inequality is a very common form of negated statement, so there is a special notation for it:
+
+ ```
+ Notation "x <> y" := (~(x = y)).
+ ```
+
+ The proposition `0 <> 1` is exactly the same as `~(0 = 1)` -- that is, `not (0 = 1)` -- which unfolds to `(0 = 1) -> False`.
+ (We use `unfold not` explicitly here, but generally it can be omitted.)
+
+ To prove an inequality, we may assune the opposite equality and deduce a contradiction from it. Here, the equality `O = S O`
+ contradicts the disjointness of constructors `O` and `S`, so [discriminate] takes care of it.
+ *)
+Theorem zero_not_one : 0 <> 1.
+Proof.
+  unfold not.
+  intros contra.
+  discriminate contra. Qed.
+
+(* It takes a little practice to get used to working with negation in Coq. Even though you can see perfectly well why a statement
+ involving negation is true, it can be a little tricky at first to see how to make Coq understand it!
+ *)
+
+Theorem not_False :
+  ~ False.
+Proof.
+  unfold not.
+  intros H. destruct H. Qed.
+
+Theorem contradiction_imples_anything : forall P Q : Prop,
+    (P /\ ~ P) -> Q.
+Proof.
+  unfold not.
+  intros P Q [H Hnot].
+  apply Hnot in H.
+  destruct H. Qed.
+
+Theorem double_neg : forall P : Prop,
+    P -> ~ ~ P.
+Proof.
+  unfold not.
+  intros P HP contra.
+  apply contra in HP.
+  destruct HP. Qed.
+
+Theorem double_neg' : forall P : Prop,
+    P -> ~ ~ P.
+Proof.
+  intros P H. unfold not.
+  intros G. apply G.
+  apply H. Qed.
+
+
+Theorem contrapositive : forall (P Q : Prop),
+    (P -> Q) -> (~Q -> ~P).
+Proof.
+  unfold not.
+  intros P Q H Qcontra HP.
+  apply H in HP.
+  apply Qcontra.
+  apply HP. Qed.
+
+Theorem not_both_true_and_false : forall P : Prop,
+    ~ (P /\ ~P).
+Proof.
+  unfold not.
+  intros P [H Hcontra].
+  apply Hcontra. apply H. Qed.
+
+(* De Morgan's Laws, named for Augustus De Morgan, describe how negation interacts with conjunction and disjunction. The following
+ law says that "the negation of a disjunction is the conjunction of the negations." There is a corresponding law `de_morgan_not_and_not`
+ that we will return to at the end of this chapter.
+ *)
+Theorem de_morgan_not_or : forall (P Q : Prop),
+    ~(P \/ Q) -> ~P /\ ~Q.
+Proof.
+  intros P Q. unfold not.
+  intros H.
+  apply conj.
+  - intros HP. apply H. left. apply HP.
+  - intros HQ. apply H. right. apply HQ. Qed.
+
+(* Since inequality involves a negation, it also requires a little practice to be able to work with it fluently. Here is one useful
+ trick.
+
+ If you are trying to prove a goal that is nonsensical (e.g., the goal state is `false = true`), apply [ex_falso_quodlibet] to change
+ the goal to `False`.
+
+ This makes it easier to use assumptions of the form `~P` that may be available in the context -- in particular, assumptions of the
+ form `x <> y`.
+ *)
+Theorem not_true_is_false : forall b : bool,
+    b <> true -> b = false.
+Proof.
+  intros b H.
+  destruct b eqn:HE.
+  - (* b = true *)
+    unfold not in H.
+    apply ex_falso_quodlibet.
+    apply H. reflexivity.
+  - (* b = false *)
+    reflexivity. Qed.
+
+(* Since reasoning with [ex_falso_quodlibet] is quite common, Coq provides a built-in tactic, [exfalso], for applying it
+ *)
+Theorem not_true_is_false' : forall b : bool,
+    b <> true -> b = false.
+Proof.
+  intros [] H.
+  - (* true branch *)
+    unfold not in H.
+    exfalso. apply H.
+    reflexivity.
+  - (* false branch *)
+    reflexivity. Qed.
+
+(** Truth
+
+ Besides `False`, Coq's standard library also defines `True`, a proposition that is trivially true. To prove it, we use
+ the constant `I : True`, which is also defined in the standard library:
+ *)
+Lemma True_is_true : True.
+Proof. apply I. Qed.
+
+(* For now, let's take a look at how we can use `True` and `False` to achieve an effect similar to that of the [discriminate]
+ tactic, without literally using [discriminate].
+
+ Pattern-matching lets us do different things for different constructors. If the result of applying two different
+ constructors were hypothetically equal, then we could use `match` to convert an unprovable statement (like `False`)
+ to one that is provable (like `True`).
+
+ To generalize this to other constructors, we simply have to provide an appropriate variant of `disc_fn`. To generalize it
+ to other conclusions, we can use [exfalso] to replace them with `False`. The built-in [discriminate] tactic takes care of
+ all of this for us!
+ *)
+Definition disc_fn (n : nat) : Prop :=
+  match n with
+  | O => True
+  | S _ => False
+  end.
+
+Theorem disc_example : forall n,
+    ~ (O = S n).
+Proof.
+  intros n H1.
+  assert (H2: disc_fn O).
+  { simpl. apply I. }
+  rewrite H1 in H2. simpl in H2.
+  apply H2. Qed.
+
+(** Logical Equivalence
+
+ The handy "is and only if" connective, which asserts that two propositions have the same truth value, is simply the conjunction
+ of two implications.
+ *)
+Module IffPlayground.
+
+Definition iff (P Q : Prop) := (P -> Q) /\ (Q -> P).
+Notation "P <-> Q" := (iff P Q)
+                        (at level 95, no associativity)
+                        : type_scope.
+
+End IffPlayground.
+
+Theorem iff_sym : forall P Q : Prop,
+    (P <-> Q) -> (Q <-> P).
+Proof.
+  intros P Q [HPQ HQP].
+  split.
+  - (* -> *)
+    apply HQP.
+  - (* <- *)
+    apply HPQ. Qed.
+
+Lemma not_true_iff_false : forall b,
+    b <> true <-> b = false.
+Proof.
+  intros b.
+  split.
+  - (* -> *)
+    apply not_true_is_false.
+  - (* <- *)
+    intros H. rewrite H.
+    intros H'. discriminate H'. Qed.
+
+(* The [apply] tactic can also be used with `<->`. We can use [apply] on an <-> in either direction, without explicitly thinking
+ about the fact that it is really an `and` underneath
+ *)
+Lemma apply_iff_example1 : forall P Q R : Prop,
+    (P <-> Q) -> (Q -> R) -> (P -> R).
+Proof.
+  intros P Q R HPiffQ HQR HP.
+  apply HPiffQ in HP.
+  apply HQR in HP.
+  apply HP. Qed.
+
+Lemma apply_iff_example1' : forall P Q R : Prop,
+    (P <-> Q) -> (Q -> R) -> (P -> R).
+Proof.
+  intros P Q R HPiffQ HQR HP.
+  apply HQR.
+  apply HPiffQ.
+  apply HP. Qed.
+
+Lemma apply_iff_example2 : forall P Q R : Prop,
+    (P <-> Q) -> (P -> R) -> (Q -> R).
+Proof.
+  intros P Q R HPiffQ HPR HQ.
+  apply HPR.
+  apply HPiffQ.
+  apply HQ. Qed.
+
+
+Theorem or_distributes_over_and : forall P Q R : Prop,
+    P \/ (Q /\ R) <-> (P \/ Q) /\ (P \/ R).
+Proof.
+  intros P Q R.
+  split.
+  - intros [HP | HQandR].
+    + apply conj.
+      * left. apply HP.
+      * left. apply HP.
+    + apply conj.
+      * right. apply HQandR.
+      * right. apply HQandR.
+  - intros [[HP | HQ] [HP' | HR]].
+    + left. apply HP.
+    + left. apply HP.
+    + left. apply HP'.
+    + right.
+      apply conj.
+      * apply HQ.
+      * apply HR. Qed.
+
+(** Setoids and Logical Equivalence
+
  
  *)
