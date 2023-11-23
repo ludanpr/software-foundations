@@ -509,5 +509,104 @@ Proof.
 
 (** Setoids and Logical Equivalence
 
- 
+ Some of Coq's tactics treat iff statements specially, avoiding some low-level proof-state manipulation. In
+ particular, [rewrite] and [reflexivity] can be used with iff statements, not just equalities. To enable this
+ behavior, we have to import the Coq library that supports it:
  *)
+From Coq Require Import Setoids.Setoid.
+
+(* A "setoid" is a set equipped with an equivalence relation -- that is, a relation that is reflexive, symmetric,
+ and transitive. When two elements of a set are equivalent according to the relation, [rewrite] can be used to
+ replace one by the other.
+
+ We've seen this already with the equality relation `=` in Coq: when `x = y`, we can use [rewrite] to replace
+ x with y or vice-versa.
+
+ Similarly, the logical equivalence relation `<->` is reflexive, symmetric, and transitive, so we can use it to
+ replace one part of a proposition with another: If `P <-> Q`, then we can use [rewrite] to replace P with Q, or
+ vice-versa.
+
+ Here is a simple example demonstrating how these tactics work with iff. First, let's prove a couple of basic
+ iff equivalences.
+ *)
+Lemma mul_eq_0 : forall n m,
+    n * m = 0 <-> n = 0 \/ m = 0.
+Proof.
+  split.
+  - apply mult_is_O.
+  - apply factor_is_O. Qed.
+
+Theorem or_assoc : forall P Q R : Prop,
+    P \/ (Q \/ R) <-> (P \/ Q) \/ R.
+Proof.
+  intros P Q R. split.
+  - intros [HP | [HQ | HR]].
+    + left. left. apply HP.
+    + left. right. apply HQ.
+    + right. apply HR.
+  - intros [[HP | HQ] | HR].
+    + left. apply HP.
+    + right. left. apply HQ.
+    + right. right. apply HR. Qed.
+
+(* We can now use these facts with [rewrite] and [reflexivity] to give smooth proofs of statements involving
+ equivalences.
+ *)
+Lemma mul_eq_0_ternary : forall n m p,
+    n * m * p = 0 <-> n = 0 \/ m = 0 \/ p = 0.
+Proof.
+  intros.
+  rewrite or_assoc.
+  rewrite <- mul_eq_0.
+  rewrite mul_eq_0.
+  reflexivity. Qed.
+
+(** Existential Quantification
+
+ Another basic logical connective is existential quantification. To say that there is some x of type T such
+ that some property P holds on x, we write ∃ x : T, P. As with ∀, the type annotation : T can be omitted if
+ Coq is able to infer from the context what the type of x should be.
+
+ To prove a statement of the form ∃ x, P, we must show that P holds for some specific choice for x, known as
+ the witness of the existential. This is done in two steps: First, we explicitly tell Coq which witness t we
+ have in mind by invoking the tactic [exists t]. Then we prove that P holds after all occurrences of x are
+ replaced by `t`.
+ *)
+Definition Even x := exists n : nat, x = double n.
+
+Lemma four_is_Even : Even 4.
+Proof.
+  unfold Even. exists 2.
+  reflexivity. Qed.
+
+(* Conversely, if we have an existential hypothesis ∃ x, P in the context, we can destruct it to obtain a
+ witness x and a hypothesis stating that P holds of x.
+ *)
+Theorem exists_example_2 : forall n,
+    (exists m, n = 4 + m) -> (exists o, n = 2 + o).
+Proof.
+  intros n [m Hm].
+  exists (2 + m).
+  apply Hm. Qed.
+
+Theorem dist_not_exists : forall (X : Type) (P : X -> Prop),
+    (forall x, P x) -> ~ (exists x, ~ P x).
+Proof.
+  intros X P H Hnot.
+  destruct Hnot as [x E].
+  apply E. apply H. Qed.
+
+Theorem dist_exists_or : forall (X : Type) (P Q : X -> Prop),
+    (exists x, P x \/ Q x) <-> (exists x, P x) \/ (exists x, Q x).
+Proof.
+  intros X P Q. split.
+  - intros [x [HP | HQ]].
+    + left. exists x. apply HP.
+    + right. exists x. apply HQ.
+  - intros [[x HP] | [x HQ]].
+    + exists x. left. apply HP.
+    + exists x. right. apply HQ. Qed.
+
+(** Programming with Propositions
+
+ )
