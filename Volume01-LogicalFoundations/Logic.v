@@ -609,4 +609,75 @@ Proof.
 
 (** Programming with Propositions
 
- )
+ The logical connectives that we have seen provide a rich vocabulary for defining complex propositions from
+ simpler ones. To illustrate, let's look at how to express the claim that an element x occurs in a list l.
+ Notice that this property has a simple recursive structure:
+
+   - If l is the empty list, then x cannot occur in it, so the property "x appears in l" is simply false.
+   - Otherwise, l has the form x' :: l'. In this case, x occurs in l if it is equal to x' or if it occurs
+     in l'.
+ *)
+Fixpoint In {A : Type} (x : A) (l : list A) : Prop :=
+  match l with
+  | [] => False
+  | x' :: l' => x' = x \/ (In x l')
+  end.
+
+(* When `In` is applied to a concrete list, it expands into a concrete sequence of nested disjunctions.
+ *)
+Example In_example_1 : In 4 [1;2;3;4;5].
+Proof.
+  simpl. right. right. right. left.
+  reflexivity. Qed.
+
+Example In_example_2 : forall n,
+    In n [2;4] -> exists n', n = 2 * n'.
+Proof.
+  simpl. intros n [H | [H | []]].
+  - exists 1. rewrite <- H. reflexivity.
+  - exists 2. rewrite <- H. reflexivity. Qed.
+
+(* (Note here how `In` starts out applied to a variable and only gets expanded when we do case analysis
+ on this variable.)
+
+ This way of defining propositions recursively is very convenient in some cases, less so in others. In
+ particular, it is subject to Coq's usual restrictions regarding the definition of recursive functions,
+ e.g., the requirement that they be "obviously terminating."
+ *)
+Theorem In_map : forall (A B : Type) (f : A -> B) (l : list A) (x : A),
+    In x l -> In (f x) (map f l).
+Proof.
+  intros A B f l x.
+  induction l as [| x' l' IHl'].
+  - (* l = nil, contradiction *)
+    simpl. intros [].
+  - (* l = x' :: l' *)
+    simpl. intros [H | H].
+    + rewrite H. left. reflexivity.
+    + right. apply IHl'. apply H. Qed.
+
+Theorem In_map_iff : forall (A B : Type) (f : A -> B) (l : list A) (y : B),
+    In y (map f l) <-> exists x, f x = y /\ In x l.
+Proof.
+  intros A B f l y.
+  split.
+  { induction l as [| x l' IHl'].
+    - simpl. intros [].   (* contradiction *)
+    - intros [H | H].
+      + exists x. apply conj.
+        * apply H.
+        * left. reflexivity.
+      + apply IHl' in H. destruct H. exists x0. apply conj.
+        * apply H.
+        * destruct H as [H1 H2]. simpl. right. apply H2. }
+  { induction l as [| x l' IHl'].
+    - simpl. intros []. apply H.
+    - intros H. destruct H. simpl in H. destruct H as [H1 H2]. simpl.
+      destruct H2 as [H2 | H2].
+      + left. rewrite <- H1. apply f_equal. apply H2.
+      + right. apply IHl'. exists x0. apply conj.
+        * apply H1.
+        * apply H2. } Qed.
+
+
+
