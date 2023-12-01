@@ -205,6 +205,21 @@ Proof.
   simpl. rewrite -> IHn'. reflexivity.
 Qed.
 
+Theorem negb_involutive' : forall b : bool,
+    negb (negb b) = b.
+Proof.
+  intros b. destruct b eqn:E.
+  - reflexivity.
+  - reflexivity. Qed.
+
+Theorem even_S : forall n : nat,
+  even (S n) = negb (even n).
+Proof.
+  intros n. induction n as [| n' IHn'].
+  - reflexivity.
+  - rewrite IHn'. simpl. rewrite negb_involutive'.
+    reflexivity. Qed.
+
 (* In Coq, as in informal mathematics, large proofs are often broken into se
  * sequence of theorems, with later proofs referring to earlier theorems. But
  * sometimes a proof will involve some miscellaneous fact that is too trivial

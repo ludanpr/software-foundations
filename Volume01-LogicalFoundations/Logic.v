@@ -737,5 +737,213 @@ Proof.
 
 (** Applying Theorems to Arguments
 
+ One feature that distinguishes Coq from other popular proof assistants is that it treats proofs as first-class
+ objects.
+
+ We have seen that we can use `Check` to ask Coq to print the type of an expression. We can also use it to ask
+ what theorem a particular identifier refers to.
+
+ Coq checks the statement of the `add_comm` theorem in the same way that it checks the type of any term (e.g.,
+ `plus`) that we ask it to `Check`.
+ *)
+Check plus : nat -> nat -> nat.
+Check @rev : forall X, list X -> list X.
+Check add_comm : forall n m : nat, n + m = m + n.
+(* Why?
+
+ The reason is that the identifier `add_comm` actually refers to a proof object -- a logical derivation establishing
+ of the truth of the statement `forall n m : nat, n + m = m + n`. The type of this object is the proposition that it
+ is a proof of.
+
+ Intuitively, this makes sense because the statement of a theorem tells us what we can use that theorem for.
+
+ Operationally, this analogy goes even further: by applying a theorem as if it were a function, i.e., applying it
+ to values and hypothesis with matching types, we can specialize its result without having to resort to intermediate
+ assertions. For example, suppose we want to prove the following result:
+ *)
+Lemma add_comm3 : forall x y z,
+    x + (y + z) = (z + y) + x.
+Proof.
+  (* It appears at first sight that we ought to be able to prove this by rewriting with [add_comm] twice to make
+   the two sides match. The problem is that the second [rewrite] will undo the effects of the first.
+   *)
+  intros x y z.
+  rewrite add_comm.
+  rewrite add_comm.
+  (* We are back where we started *)
+Abort.
+
+(* We encountered similar issues back in [induction], and we saw one way to work around them by using [assert] to
+ derive a specialized version of [add_comm] that can be used to rewrite exactly where we want.
+ *)
+Lemma add_comm3_take2 : forall x y z : nat,
+    x + (y + z) = (z + y) + x.
+Proof.
+  intros x y z.
+  rewrite add_comm.
+  assert (H : y + z = z + y).
+  { rewrite add_comm. reflexivity. }
+  rewrite H.
+  reflexivity. Qed.
+
+(* A more elegant alternative is to apply [add_comm] directly to the arguments we want to instantiate it with, in much
+ the same way as we apply a polymorphic function to a type argument.
+ *)
+Lemma add_comm3_take3 : forall x y z : nat,
+    x + (y + z) = (z + y) + x.
+Proof.
+  intros x y z.
+  rewrite add_comm.
+  rewrite (add_comm y z).
+  reflexivity. Qed.
+
+(* Here's another example of using a theorem like a function. The following theorem says: if a list `l` contains some
+ element `x`, then `l` must be nonempty.
+ *)
+Theorem in_not_nil : forall A (x : A) (l : list A),
+    In x l -> l <> [].
+Proof.
+  intros A x l H. unfold not. intro H'.
+  rewrite H' in H. simpl in H.
+  apply H. Qed.
+(* What makes this interesting is that one quantified variable (x) does not appear in the conclusion (`l <> []`).
+
+ Intuitively, we should be able to use this theorem to prove the special case where x is 42. However, simply invoking
+ the tactic [apply in_not_nil] will fail because it cannot infer the value of x.
+ *)
+Lemma in_not_nil_42 : forall l : list nat,
+    In 42 l -> l <> [].
+Proof.
+  intros l H.
+  Fail apply in_not_nil.
+Abort.
+(* There are several ways to work around this:
+
+ Use [apply ... with ...]
+ *)
+Lemma in_not_nil_42_take2 : forall l : list nat,
+    In 42 l -> l <> [].
+Proof.
+  intros l H.
+  apply in_not_nil with (x := 42).
+  apply H. Qed.
+(* Use [apply ... in ...]
+ *)
+Lemma in_not_nil_42_take3 : forall l : list nat,
+    In 42 l -> l <> [].
+Proof.
+  intros l H.
+  apply in_not_nil in H.
+  apply H. Qed.
+(* Explicitly apply the lemma to the value for x.
+ *)
+Lemma in_not_nil_42_take4 : forall l : list nat,
+    In 42 l -> l <> [].
+Proof.
+  intros l H.
+  apply (in_not_nil nat 42).
+  apply H. Qed.
+(* Explicitly apply the lemma to a hypothesis (causing the values of the other parameters to be inferred)
+ *)
+Lemma in_not_nil_42_take5 : forall l : list nat,
+    In 42 l -> l <> [].
+Proof.
+  intros l H.
+  apply (in_not_nil _ _ _ H). Qed.
+
+(* You can "use a theorem as a function" in this way with almost any tactic that can take a theorem's name as
+ an argument.
+
+ Note, also, that theorem application uses the same inference mechanisms as function application; thus, it is
+ possible, for example, to supply wildcards as arguments to be inferred, or to declare some hypotheses to a
+ theorem as implicit by default. These features are illustrated in the proof below.
+ *)
+Example lemma_application_ex : forall (n : nat) (ns : list nat),
+    In n (map (fun m => m * 0) ns) -> n = 0.
+Proof.
+  intros n ns H.
+  destruct (proj1 _ _ (In_map_iff _ _ _ _ _) H) as [m [Hm _]].
+  rewrite <- Hm. apply mul_0_r. Qed.
+
+(** Working with Decidable Properties
+
+ We've seen two different ways of expressing logical claims in Coq: with booleans (of type `bool`), and with
+ propositions (of type `Prop`).
+
+ Here are the key differences between `bool` and `Prop`:
+                                                        bool     Prop
+                                                        ====     ====
+                       decidable?                       yes       no
+                       useable with match?              yes       no
+                       works with rewrite tactic?       no        yes
+
+ The crucial difference between the two worlds is decidability. Every (closed) Coq expression of type `bool`
+ can be simplified in a finite number of steps to either `true` or `false` -- i.e., there is a terminating
+ mechanical procedure for deciding whether or not it is `true`.
+
+ This means that, for example, the type `nat -> bool` is inhabited only by functions that, given a `nat`,
+ always yield either `true` or `false` in finite time; and this, in turn, means (by a standard computability
+ argument) that there is no function in `nat -> bool` that checks whether a given number is the code of a
+ terminating Turing machine.
+
+ By contrast, the type `Prop` includes both decidable and undecidable mathematical propositions; in particular,
+ the type `nat -> Prop` does contain functions representing properties like "the nth Turing matchine halts."
+
+ The second row in the table follows directly from this essential difference. To evaluate a pattern match (or
+ conditional) on a boolean, we need to know whether the scrutinee evaluate to `true` or `false`; this only
+ works for `bool`, not `Prop`.
+
+ The third row highlights another important practical difference: equality functions like `eqb_nat` that return
+ a boolean cannot be used directly to justify rewriting with the [rewrite] tactic; propositional equality is
+ required for this.
+
+ Since `Prop` includes both decidable and undecidable properties, we have two choices when we want to formalize
+ property that happens to be decidable: we can express it either as a boolean computation or as a function into
+ `Prop`.
+ *)
+Example even_42_bool : even 42 = true.
+Proof. reflexivity. Qed.
+(* ... or that there exists some k such that `n = double k`.
+ *)
+Example even_42_prop : Even 42.
+Proof. unfold Even. exists 21. reflexivity. Qed.
+
+
+(* Of course, it would be pretty strange if these two characterizations of evenness did not describe the same
+ set of natural numbers! Fortunately, we can prove that they do ...
+
+ We first need two helper lemmas.
+ *)
+Lemma even_double : forall k,
+    even (double k) = true.
+Proof.
+  intros k. induction k as [| k' IHk'].
+  - reflexivity.
+  - simpl. apply IHk'. Qed.
+
+Lemma even_double_conv : forall n,
+    exists k, n = if even n then double k else S (double k).
+Proof.
+  intros n. induction n as [| n' IHn'].
+  - simpl. exists 0. reflexivity.
+  - rewrite even_S. destruct IHn' as [k E].
+    destruct (even n').
+    + exists k. rewrite E. reflexivity.
+    + simpl. rewrite E. exists (S k). reflexivity. Qed.
+
+(* Now the main theorem:
+ *)
+Theorem even_bool_prop : forall n,
+    even n = true <-> Even n.
+Proof.
+  intros n. split.
+  - intros H. destruct (even_double_conv n) as [k Hk].
+    rewrite Hk. rewrite H.
+    unfold Even. exists k. reflexivity.
+  - intros [k Hk]. rewrite Hk. apply even_double. Qed.
+
+(* In view of this theorem, we can say that the boolean computation `even n` is reflected in the truth of the proposition
+ `exists k, n = double k`.
+
  
  *)
