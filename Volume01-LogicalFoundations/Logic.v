@@ -679,5 +679,63 @@ Proof.
         * apply H1.
         * apply H2. } Qed.
 
+Theorem In_app_iff : forall A l l' (a : A),
+    In a (l ++ l') <-> In a l \/ In a l'.
+Proof.
+  intros A l. induction l as [| a' l' IH].
+  - split.
+    + simpl. intros H. right. apply H.
+    + simpl. intros [H | H].
+      * destruct H.
+      * apply H.
+  - intros l'' a. simpl. rewrite IH.
+    split.
+    + intros [H | [H | H]].
+      * left. left. apply H.
+      * left. right. apply H.
+      * right. apply H.
+    + intros [[H | H] | H].
+      * left. apply H.
+      * right. left. apply H.
+      * right. right. apply H. Qed.
 
+(* We noted above that functions returning propositions can be seen as properties of their arguments. For instance,
+ if `P` has type `nat -> Prop`, then `P n` says that property `P` holds of `n`
 
+ Drawing inspiration from `In`, write a recursive function `All` stating that some property `P` holds of all elements
+ of a list `l`. To make sure your definition is correct, prove the `All_In` lemma below.
+ *)
+Fixpoint All {T : Type} (P : T -> Prop) (l : list T) : Prop :=
+  match l with
+  | nil => True
+  | h :: hs => P h /\ All P hs
+  end.
+
+Example All_test_1 : (All Even [2;4;6;8]).
+Proof.
+  simpl.
+  apply conj. unfold Even. exists 1. reflexivity.
+  apply conj. unfold Even. exists 2. reflexivity.
+  apply conj. unfold Even. exists 3. reflexivity.
+  apply conj. unfold Even. exists 4. reflexivity.
+  reflexivity. Qed.
+
+Theorem All_In : forall T (P : T -> Prop) (l : list T),
+    (forall x, In x l -> P x) <-> All P l.
+Proof.
+  intros T P l. induction l as [| x' l' IHl'].
+  - simpl. split.
+    + intros H. reflexivity.
+    + intros H H' [].
+  - simpl. split.
+    + intros H. rewrite <- IHl'. apply conj.
+      * apply H. left. reflexivity.
+      * intros x HIn. apply H. right. apply HIn.
+    + intros [H1 H2] x [H | H].
+      * rewrite H in H1. apply H1.
+      * apply IHl'. apply H2. apply H. Qed.
+
+(** Applying Theorems to Arguments
+
+ 
+ *)
