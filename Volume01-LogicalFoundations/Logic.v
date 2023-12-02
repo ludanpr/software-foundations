@@ -945,5 +945,179 @@ Proof.
 (* In view of this theorem, we can say that the boolean computation `even n` is reflected in the truth of the proposition
  `exists k, n = double k`.
 
- 
+ Similarly, to state that two numbers `n` and `m` are equal, we can say either
+
+   - (1) that `n =? m` returns `true`, or
+   - (2) that `n = m`
+
+ Again, these two notions are equivalent:
  *)
+Theorem eqb_eq : forall n m : nat,
+    n =? m = true <-> n = m.
+Proof.
+  intros n m. split.
+  - apply eqb_true.
+  - intros H. rewrite H. apply eqb_refl. Qed.
+
+(* Even when the boolean and propositional formulations of a claim are interchangeable from a purely logical perspective,
+ it can be more convenient to use one over the other.
+
+ For example, there is no effective way to test whether or not a `Prop` is true in a function definition; as a consequence,
+ the following definition is rejected:
+ *)
+Fail
+Definition is_even_prime n :=
+  if n = 2 then true else false.
+(* Coq complains that `n = 2` has type `Prop`, while it expects an element of `bool` (or some other inductive type with
+ two elements). This has to do with the computational nature of Coq's core language, which is designed so that every
+ function it can express is computable and total. One reason for this is to allow the extraction of executable programs
+ from Coq developments. As a consequence, `Prop` in Coq does not have a universal case analysis operation telling whether
+ any given proposition is true or false, since such an operation would allow us to write non-computable functions.
+
+ Rather, we have to state this definition using a boolean equality test.
+ *)
+Definition is_even_prime n :=
+  if n =? 2 then true else false.
+
+(* Beyond the fact that non-computable properties are impossible in general to phrase as boolean computations, even many
+ computable properties are easier to express using `Prop` than `bool`, since recursive function definitions in Coq are
+ subject to significant restrictions. For instance, the next chapter shows how to define the property that a regular
+ expression matches a given string using `Prop`. Doing the same with `bool` would amount to writing a regular expression
+ matching algorithm, which would be more complicated, harder to understand, and harder to reason about than a simple
+ (non-algorithmic) definition of this property
+
+ Conversely, an important side benefit of stating facts using booleans is enabling some proof automation through computation
+ with Coq terms, a technique known as proof by reflection.
+
+ Consider the following statement:
+ *)
+Example even_1000 : Even 1000.
+(* The most direct way to prove this is to give the value of `k` explicitly.
+ *)
+Proof.
+  unfold Even. exists 500. reflexivity. Qed.
+
+(* The proof of the corresponding boolean statement is simpler, because we don't have to invent the witness `500`: Coq's
+ computation mechanism does it for us.
+ *)
+Example even_1000' : even 1000 = true.
+Proof.
+  reflexivity. Qed.
+
+(* Now, the useful observation is that, since the two notions are equivalent, we can use the boolean formulation to prove
+ the other one without mentioning the value 500 explicitly.
+ *)
+Example even_1000'' : Even 1000.
+Proof.
+  apply even_bool_prop. reflexivity. Qed.
+
+(* Although we haven't gained much in terms of proof-script line count in this case, larger proofs can often be made considerably
+ simpler by the use of reflection. As an extreme example, a famous Coq proof of the even more famous 4-color theorem uses reflection
+ to reduce the analysis of hundreds of different cases to a boolean computation.
+
+ Another advantage of booleans is that the negation of a "boolean fact" is straightforward to state and prove: simply flip the
+ expected boolean result.
+ *)
+Example not_even_1001 : even 1001 = false.
+Proof.
+  reflexivity. Qed.
+
+(* In contrast, propositional negation can be difficult to work with directly.
+
+ For example, suppose we state the non-evenness of `1001` propositionaly:
+ *)
+Example not_even_1001' : ~(Even 1001).
+(* Proving this directly -- by assuming that there is some n such that `1001 = double n` and then
+ somehow reasoning to a contradiction -- would be rather complicated. But if we convert it to a
+ claim about the boolean even function, we can let Coq do the work for us.
+ *)
+Proof.
+  rewrite <- even_bool_prop.
+  unfold not.
+  simpl. intro H.
+  discriminate H. Qed.
+
+(* Conversely, there are complementary situations where it can be easier to work with propositions rather than booleans.
+
+ In particular, knowing that `(n =? m) = true` is generally of little direct help in the middle of a proof involving `n` and `m`, but
+ if we convert the statement to the equivalent form `n = m`, we can rewrite with it.
+ *)
+Lemma plus_eqb_example : forall n m p : nat,
+    n =? m = true -> n + p =? m + p = true.
+Proof.
+  intros n m p H.
+  rewrite eqb_eq in H.
+  rewrite H.
+  rewrite eqb_eq.
+  reflexivity. Qed.
+
+
+Theorem andb_true_iff : forall b1 b2 : bool,
+    b1 && b2 = true <-> b1 = true /\ b2 = true.
+Proof.
+  intros b1 b2. split.
+  - intros H. apply conj.
+    + destruct b1.
+      * reflexivity.
+      * simpl in H. discriminate H.
+    + destruct b2.
+      * reflexivity.
+      * destruct b1.
+        simpl in H. discriminate H. simpl in H. discriminate H.
+  - intros [H1 H2].
+    rewrite H1. rewrite H2. reflexivity. Qed.
+
+Theorem orb_true_iff : forall b1 b2,
+    b1 || b2 = true <-> b1 = true \/ b2 = true.
+Proof.
+  intros b1 b2. split.
+  - intros H.
+    destruct b1.
+    + left. reflexivity.
+    + simpl in H. right. apply H.
+  - intros [H | H].
+    + rewrite H. reflexivity.
+    + rewrite H. destruct b1.
+      * reflexivity.
+      * reflexivity. Qed.
+
+(* The following theorem is an alternate "negative" formulation of `eqb_eq` that is more convenient in certain situations.
+ *)
+Theorem eqb_neg : forall x y : nat,
+    x =? y = false <-> x <> y.
+Proof.
+  intros x y. split.
+  - unfold not. intros H1 H2.
+    rewrite <- eqb_eq in H2.
+    rewrite H1 in H2. discriminate H2.
+  - unfold not. intros H. rewrite <- eqb_eq in H.
+    destruct (x =? y).
+    + destruct H. reflexivity.
+    + reflexivity. Qed.
+
+(* Given a boolean operator `eqb` for testing equality of elements of some type `A`, we can define a function `eqb_list` for
+ testing equality of lists with elements in `A`.
+ *)
+Fixpoint eqb_list {A : Type} (eqb : A -> A -> bool) (l1 l2 : list A) : bool :=
+  match l1, l2 with
+  | [], [] => true
+  | [], _ => false
+  | _, [] => false
+  | h1 :: hs1, h2 :: hs2 => eqb h1 h2 && eqb_list eqb hs1 hs2
+  end.
+
+Example eqb_list_test_1 : eqb_list eqb [] [] = true.
+Proof. reflexivity. Qed.
+Example eqb_list_test_2 : eqb_list eqb [1;2;3] [1;2;3] = true.
+Proof. reflexivity. Qed.
+Example eqb_list_test_3 : eqb_list eqb [1;2;3] [2;4;5] = false.
+Proof. reflexivity. Qed.
+
+Theorem eqb_list_true_iff : forall A (eqb : A -> A -> bool),
+    (forall a1 a2, eqb a1 a2 = true <-> a1 = a2) ->
+    forall l1 l2, eqb_list eqb l1 l2 = true <-> l1 = l2.
+Proof.
+  intros A eqb H l1 l2.
+  Abort.
+
+
