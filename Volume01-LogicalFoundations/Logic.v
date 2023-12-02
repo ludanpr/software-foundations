@@ -1120,4 +1120,92 @@ Proof.
   intros A eqb H l1 l2.
   Abort.
 
+(* Checks whether every element in a list satisfies a given predicate.
+ *)
+Fixpoint forallb {X : Type} (test : X -> bool) (l : list X) : bool :=
+  match l with
+  | [] => true
+  | h :: hs => if test h then forallb test hs else false
+  end.
 
+Theorem forallb_true_iff : forall X test (l : list X),
+    forallb test l = true <-> All (fun x => test x = true) l.
+Proof.
+  intros X test l. split.
+  - induction l as [| h l' IHl'].
+    + intros H. reflexivity.
+    + simpl. destruct (test h).
+      * intros H. apply conj.
+        reflexivity.
+        apply IHl'. apply H.
+      * intros H. discriminate H.
+  - induction l as [| h l' IHl'].
+    + intros H. reflexivity.
+    + simpl. intros H. destruct (test h).
+      apply IHl'. apply H.
+      destruct H as [H' H'']. discriminate H'. Qed.
+
+(** The Logic of Coq
+
+ Coq's logical core, the Calculus of Inductive Constructions, differs in some important ways from other formal systems
+ that are used by mathematicians to write down precise and rigorous definitions and proofs -- in particular from Zermelo-
+ Fraenkel Set Theory (ZFC), the most popular foundation for paper-and-pencil mathematics.
+
+ We conclude this chapter with a brief discussion of some of the most significant differences between these two worlds.
+ *)
+
+(** Functional Extensionality
+
+ Coq's logic is quite minimalistic. This means that one occasionally encounters cases where translating standard mathematical
+ reasoning into Coq is cumbersome -- or even impossible -- unless we enrich its core logic with additional axioms.
+
+ For example, the equality assertions that we have seen so far mostly have concerned elements of inductive types. But, since
+ Coq's equality operator is polymorphic, we can use it at any type -- in particular, we can write propositions claiming that
+ two functions are equal to each other:
+ *)
+Example function_equality_ex1 : (fun x => 3 + x) = (fun x => (pred 4) + x).
+Proof. reflexivity. Qed.
+(* These two functions are equal just by simplification, but in general functions can be equal for more interesting reasons.
+
+ In common mathematical practice, two functions f and g are considered equal if they produce the same output on every input:
+
+      (forall x, f x = g x) -> f = g.
+
+ This is known as the principle of functional extensionality.
+
+ (Informally, an "extensional property" is one that pertains to an object's observable behavior. Thus, functional extensionality
+ simply means that a function's identity is completely determined by what we can observe from it -- i.e., the results we obtain
+ after applying it.)
+
+ However, functional extensionality is not part of Coq's built-in logic. This means that some intuitively obvious propositions
+ are not provable.
+ *)
+Example function_equality_ex2 : (fun x => plus x 1) = (fun x => plus 1 x).
+Proof. (* Stuck *) Abort.
+
+(* However, if we like, we can add functional extensionality to Coq's core using the `Axiom` command.
+ *)
+Axiom functional_extensionality : forall {X Y : Type} {f g : X -> Y},
+    (forall (x : X), f x = g x) -> f = g.
+
+(* Defining something as an `Axiom` has the same effect as stating a theorem and skipping its proof using `Admitted`, but it
+ alerts the reader that this isn't just something we're going to come back and fill in later!
+
+ We can now invoke functional extensionality in proofs:
+ *)
+Example function_equality_ex2' : (fun x => plus x 1) = (fun x => plus 1 x).
+Proof.
+  apply functional_extensionality.
+  intros x. apply add_comm. Qed.
+
+(* Naturally, we need to be quite careful when adding new axioms into Coq's logic, as this can render it inconsistent -- that
+ is, it may become possible to prove every proposition, including `False`, `2+2=5`, etc.!
+
+ In general, there is no simple way of telling whether an axiom is safe to add: hard work by highly trained mathematicians is
+ often required to establish the consistency of any particular combination of axioms.
+
+ Fortunately, it is known that adding functional extensionality, in particular, is consistent.
+
+ To check whether a particular proof relies on any additional axioms, use the `Print Assumptions` command:
+ *)
+Print Assumptions function_equality_ex2'.
