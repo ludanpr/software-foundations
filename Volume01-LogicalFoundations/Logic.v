@@ -1209,3 +1209,44 @@ Proof.
  To check whether a particular proof relies on any additional axioms, use the `Print Assumptions` command:
  *)
 Print Assumptions function_equality_ex2'.
+
+(* One problem with the definition of the list-reversing function rev that we have is that it performs a call to app on each step.
+ Running app takes time asymptotically linear in the size of the list, which means that rev is asymptotically quadratic. We can
+ improve this with the following two-argument definition:
+ *)
+Fixpoint rev_append {X} (l1 l2 : list X) : list X :=
+  match l1 with
+  | [] => l2
+  | x :: l1' => rev_append l1' (x :: l2)
+  end.
+
+Definition tr_rev {X} (l : list X) : list X :=
+  rev_append l [].
+
+(* This version of `rev` is said to be tail-recursive, because the recursive call to the function is the last operation that needs
+ to be performed (i.e., we don't have to execute `++` after the recursive call); a decent compiler will generate very efficient code
+ in this case
+ *)
+Lemma rev_append_rev_app : forall X (l1 l2 : list X),
+    rev_append l1 l2 = rev l1 ++ l2.
+Proof.
+  intros X l1.
+  induction l1 as [| h1 l1' IHl1'].
+  - intros l2. reflexivity.
+  - intros l2. simpl.
+    rewrite IHl1'. rewrite <- app_assoc.
+    reflexivity. Qed.
+
+Theorem tr_rev_correct : forall X,
+    @tr_rev X = @rev X.
+Proof.
+  intros X. unfold tr_rev.
+  apply functional_extensionality. intros l.
+  induction l as [| h l' IHl'].
+  - reflexivity.
+  - simpl. apply rev_append_rev_app. Qed.
+
+(** Classical vs. Constructive Logic
+
+ 
+ *)
