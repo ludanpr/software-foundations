@@ -1248,5 +1248,144 @@ Proof.
 
 (** Classical vs. Constructive Logic
 
- 
+ We have seen that it is not possible to test whether or not a proposition `P` holds while defining a Coq function. You may be
+ surprised to learn that a similar restriction applies in proofs! In other words, the following intuitive reasoning principle is
+ not derivable in Coq:
  *)
+Definition excluded_middle := forall P : Prop,
+    P \/ ~P.
+(* To understand operationally why this is the case, recall that, to prove a statement of the form `P \/ Q`, we use the [left]
+ and [right] tactics, which effectively require knowing which side of the disjuction holds. But the universally quantified `P`
+ in `excluded_middle` is an arbitrary proposition, which we know nothing about. We don't have enough information to choose which
+ of [left] or [right] to apply, just as Coq doesn't have enough information to mechanically decide whether `P` holds or not inside
+ a function.
+
+ In the special case where we happen to know that `P` is reflected in some boolean term `b`, knowing whether it holds or not is
+ trivial: we just have to check the value of `b`.
+ *)
+Theorem restricted_excluded_middle : forall P b,
+    (P <-> b = true) -> P \/ ~P.
+Proof.
+  intros P [] H.
+  - rewrite H. left. reflexivity.
+  - rewrite H. right.
+    intros contra. discriminate contra. Qed.
+
+(* In particular, the excluded middle is valid for equations `n = m`, between natural numbers `n` and `m`.
+ *)
+Theorem restricted_excluded_middle_eq : forall (n m : nat),
+    n = m \/ n <> m.
+Proof.
+  intros n m.
+  apply (restricted_excluded_middle (n = m) (n =? m)).
+  symmetry.
+  apply eqb_eq. Qed.
+
+(* Sadly, this trick only works with decidable propositions.
+
+ It may seem strange that the general excluded middle is not available by default in Coq, since it is a standard feature of familiar
+ logics like ZFC. But there is a distinct advantage in not assuming the excluded middle: statements in Coq make stronger claims than
+ the analogous statements in standard mathematics. Notably, a Coq proof of `exists x, P x` always includes a particular value of `x`
+ for which we can prove `P x` -- in other words, every proof of existence is constructive.
+
+ Logics like Coq's, which do not assume the excluded middle, are referred to as constructive logics. More conventional logical systems
+ such as ZFC, in which the excluded middle does hold for arbitrary propositions, are referred to as classical.
+
+ The following example illustrates why assuming the excluded middle may lead to non-constructive proofs:
+
+ Claim: There exist irrational numbers a and b such that a ^ b (a to the power b) is rational.
+
+ Proof: It is not difficult to show that sqrt 2 is irrational. If sqrt 2 ^ sqrt 2 is rational,
+ it suffices to take a = b = sqrt 2 and we are done. Otherwise, sqrt 2 ^ sqrt 2 is irrational.
+ In this case, we can take a = sqrt 2 ^ sqrt 2 and b = sqrt 2,
+ since a ^ b = sqrt 2 ^ (sqrt 2 × sqrt 2) = sqrt 2 ^ 2 = 2. ☐
+
+
+ Do you see what happened here? We used the excluded middle to consider separately the cases where sqrt 2 ^ sqrt 2 is rational and where
+ it is not, without knowing which one actually holds! Because of this, we finish the proof knowing that such a and b exist, but not knowing
+ their actual values.
+
+ As useful as constructive logic is, it does have its limitations: There are many statements that can easily be proven in classical logic
+ but that have only much more complicated constructive proofs, and there are some that are known to have no constructive proof at all!
+ Fortunately, like functional extensionality, the excluded middle is known to be compatible with Coq's logic, allowing us to add it safely
+ as an axiom. However, we will not need to do so here: the results that we cover can be developed entirely within constructive logic at
+ negligible extra cost.
+
+ It takes some practice to understand which proof techniques must be avoided in constructive reasoning, but arguments by contradiction,
+ in particular, are infamous for leading to non-constructive proofs. Here's a typical example: suppose that we want to show that there
+ exists x with some property P, i.e., such that P x. We start by assuming that our conclusion is false; that is, ¬ ∃ x, P x. From this
+ premise, it is not hard to derive ∀ x, ¬ P x. If we manage to show that this intermediate fact results in a contradiction, we arrive at
+ an existence proof without ever exhibiting a value of x for which P x holds!
+
+ The technical flaw here, from a constructive standpoint, is that we claimed to prove ∃ x, P x using a proof of ¬ ¬ (∃ x, P x). Allowing
+ ourselves to remove double negations from arbitrary statements is equivalent to assuming the excluded middle law, as shown in one of the
+ exercises below. Thus, this line of reasoning cannot be encoded in Coq without assuming additional axioms.
+ *)
+
+(* Proving the consistency of Coq with the general excluded middle axiom requires complicated reasoning that cannot be carried out within
+ Coq itself. However, the following theorem implies that it is always safe to assume a decidability axiom (i.e., an instance of excluded
+ middle) for any particular Prop `P`. Why? Because the negation of such an axiom leads to a contradiction. If `~(P \/ ~P)` were provable,
+ then by `de_morgan_not_or` as proved above, `P /\ ~P` would be provable, which would be a contradiction. So, it is safe to add `P \/ ~P`
+ as an axiom for any particular `P`.
+
+ Succinctly: for any proposition P, Coq is consistent ==> (Coq + P \/ ~P) is consistent.
+ *)
+Theorem excluded_middle_irrefutable : forall (P : Prop),
+    ~~(P \/ ~P).
+Proof.
+  intros P H. unfold not in H.
+  apply H. right. intros H'.
+  apply H. left. apply H'. Qed.
+
+(* It is a theorem of classical logic that the following two assertions are equivalent:
+
+      ¬(∃ x, ¬P x)
+        ∀ x, P x
+
+ The `dist_not_exists` theorem above proves one side of this equivalence. Interestingly, the other direction cannot be proved in constructive
+ logic. Your job is to show that it is implied by the excluded middle.
+ *)
+Theorem not_exists_dist :
+  excluded_middle -> forall (X : Type) (P : X -> Prop),
+      ~(exists x, ~ P x) -> (forall x, P x).
+Proof.
+  unfold excluded_middle.
+  intros EM X P H x.
+  assert (H': P x \/ ~ P x).
+  apply EM. destruct H' as [H' | H'].
+  - apply H'.
+  - destruct H. exists x. apply H'. Qed.
+
+(* For those who like a challenge, here is an exercise taken from the Coq'Art book by Bertot and Casteran (p. 123). Each of the following four
+ statements, together with excluded_middle, can be considered as characterizing classical logic. We can't prove any of them in Coq, but we can
+ consistently add any one of them as an axiom if we wish to work in classical logic.
+
+ Prove that all five propositions (these four plus excluded_middle) are equivalent.
+
+ excluded_middle -> double_negation_elimination -> 
+ *)
+Definition peirce := forall P Q : Prop,
+    ((P -> Q) -> P) -> P.
+
+Definition double_negation_elimination := forall P : Prop,
+    ~~ P -> P.
+
+Definition de_morgan_not_and_not := forall P Q : Prop,
+    ~ (~ P /\ ~ Q) -> P \/ Q.
+
+Definition implies_to_or := forall P Q : Prop,
+    (P -> Q) -> (~ P \/ Q).
+
+Theorem excluded_middle_implies_double_negation_elimination : excluded_middle -> double_negation_elimination.
+Proof.
+  unfold excluded_middle. unfold double_negation_elimination.
+  intros H1 P H2.
+  assert (H': P \/ ~P).
+  apply H1. destruct H' as [H' | H'].
+  - apply H'.
+  - destruct H2. apply H'. Qed.
+
+Theorem double_negation_elimination_implies_peirce : double_negation_elimination -> peirce.
+Proof.
+  unfold double_negation_elimination. unfold peirce.
+Abort.
