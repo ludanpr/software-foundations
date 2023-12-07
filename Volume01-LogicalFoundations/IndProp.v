@@ -190,4 +190,94 @@ Proof.
 
 (* Example: Evenness (yet again)
 
+ We've already seen two ways of stating a proposition that a number n is even: We can say
+
+    (1) even n = true, or
+    (2) exists k, n = double k.
+
+ A third possibility, which we'll use as a running example for the rest of this chapter, is to say that n is even if
+ we can establish its evenness from the following rules:
+
+    - The number 0 is even.
+    - If n is even, then S (S n) is even.
+
+ To illustrate how this new definition of evenness works, let's imagine using it to show that 4 is even. First, we
+ give the rules names for easy reference:
+
+    - Rule ev_0: The number 0 is even.
+    - Rule ev_SS: If n is even, then S (S n) is even.
+
+ Now, by rule ev_SS, it suffices to show that 2 is even. This, in turn, is again guaranteed by rule ev_SS as long as
+ we can show that 0 is even. But this last fact follows directly from the ev_0 rule.
+
+ We can translate the informal definition of evenness from above into a forma `Inductive` declaration, where each "way
+ that a number can be even" corresponds to a separate constructor:
+ *)
+Inductive ev : nat -> Prop :=
+  | ev_0 : ev 0
+  | ev_SS (n : nat) (H : ev n) : ev (S (S n)).
+(* This definition is interestingly different from previous uses of `Inductive`. For one thing, we are defining not a
+ `Type` or a function yielding a `Type`, but rather a function from `nat` to `Prop` -- that is, a property of numbers.
+ But what is really new is that, because the `nat` argument of `ev` appears to the right of the colon on the first line,
+ it is allowed to take different values in the types of different constructors: 0 in the type of ev_0 and S (S n) in the
+ type of ev_SS. Accordingly, the type of each constructor must be specified explicitly, and each constructor's type must
+ have the form `ev n` for some natural number `n`.
+
+ In contrast, recall the definition of `list`:
+
+       Inductive list (X : Type) : Type :=
+          | nil
+          | cons (x : X) (l : list X).
+
+  or equivalently:
+
+       Inductive list (X : Type) : Type :=
+         | nil : list X
+         | cons (x : X) (l : list X) : list X.
+
+ This definition introduces the `X` parameter globally, to the left of the colon, forcing the result of `nil` and `cons`
+ to be the same type (i.e., `list X`). But if we had tried to bring `nat` to the left of the colon in defining `ev`, we
+ would havbe seen an error:
+ *)
+Fail Inductive wrong_ev (n : nat) : Prop :=
+  | wrong_ev_0 : wrong_ev 0
+  | wrong_ev_SS (H : wrong_ev n) : wrong_ev (S (S n)).
+
+(* In an `Inductive` definition, an argument to the type constructor on the left of the colon is called a "parameter",
+ whereas an argument on the right is called an "index" or "annotation".
+
+ We can think of this as defining a Coq property `ev : nat -> Prop`, together with "evidence constructors" `ev_0 : ev 0`
+ and `ev_SS : forall n, ev n -> ev (S (S n))`.
+
+ These evidence constructors can be though of as "primitive evidence of evenness", and they can be used just like proven
+ theorems. In particular, we can use Coq's [apply] tactic with the constructor names to obtain evidence for `ev` of particular
+ numbers...
+ *)
+Theorem ev_4 : ev 4.
+Proof.
+  apply ev_SS. apply ev_SS.
+  apply ev_0. Qed.
+(* ... or we can use function application syntax to combine several constructors.
+ *)
+Theorem ev_4' : ev 4.
+Proof.
+  apply (ev_SS 2 (ev_SS 0 ev_0)). Qed.
+
+(* In this way, we can also prove theorems that have hypotheses involving `ev`.
+ *)
+Theorem ev_plus4 : forall n,
+    ev n -> ev (4 + n).
+Proof.
+  intros n. simpl. intros Hn.
+  apply ev_SS. apply ev_SS. apply Hn. Qed.
+
+Theorem ev_double : forall n,
+    ev (double n).
+Proof.
+  intros n. unfold double. induction n as [| n' IHn'].
+  - apply ev_0.
+  - apply ev_SS. apply IHn'. Qed.
+
+(** Using Evidence in Proofs
+
  *)
