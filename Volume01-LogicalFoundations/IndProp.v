@@ -280,4 +280,180 @@ Proof.
 
 (** Using Evidence in Proofs
 
+ Besides constructing evidence that numbers are even, we can also destruct such evidence, reasoning about how it could have
+ been built.
+
+ Defining `ev` with an `Inductive` declaration tells Coq not only that the constructors `ev_0` and `ev_SS` are valid ways to
+ build evidence that some number is `ev`, but also that these two constructors are the only ways to build evidence that numbers
+ are `ev`.
+
+ In other words, if someone gives us evidence `E` for the assertion `ev n`, then we know that E must be one of two things:
+
+    - E is ev_0 (and n is O), or
+    - E is ev_SS n' E' (and n is S (S n'), where E' is evidence for ev n').
+
+ This suggests that it should be possible to analyze a hypothesis of the form `ev n` much as we do inductively defined data
+ structures; in particular, it should be possible to argue by case analysis or by induction on such evidence.
+
+ ** Inversion on Evidence
+
+ Suppose we are proving some fact involving a number `n`, and we are given `ev n` as a hypothesis. We already know how to
+ perform case analysis on n using [destruct] or [induction], generating separate subgoals for the case where `n = O` and the
+ case where `n = S n'` for some n'. But for some proofs we may instead want to analyze the evidence for `ev n` directly.
+
+ As a tool for such proofs, we can formalize the intuitive characterization that we gave above for evidence of `ev n`, using
+ [destruct].
+ *)
+Theorem ev_inversion : forall (n : nat),
+    ev n -> (n = 0) \/ (exists n', n = S (S n') /\ ev n').
+Proof.
+  intros n E. destruct E as [| n' E'] eqn:EE.
+  - (* E = ev_0 : ex 0 *)
+    left. reflexivity.
+  - (* E = ev_SS n' E' : ev (S (S n')) *)
+    right. exists n'. split.
+    + reflexivity.
+    + apply E'. Qed.
+
+(* Facts like this are often called "inversion lemmas" because they allow us to "invert" some given information to reason about
+ all the different ways it could have been derived.
+
+ Here, there two ways to prove `ev n`, and the inversion lemma makes it explicit.
+
+ We can use the inversion lemma that we proved above to help structure proofs:
+ *)
+Theorem evSS_ev : forall n,
+    ev (S (S n)) -> ev n.
+Proof.
+  intros n H. apply ev_inversion in H.
+  destruct H as [H | H].
+  - discriminate H.
+  - destruct H as [n' [E1 E2]].
+    injection E1 as E1'. rewrite E1'. apply E2. Qed.
+(* Note how the inversion lemma produces two subgoals, which correspond to the two ways of proving `ev`. The first subgoal is a
+ contradiction that is discharged with [discriminate]. The second subgoal makes use of [injection] and [rewrite].
+
+ Coq provides a handy tactic called [inversion] that factors out this common pattern, saving us the trouble of explicitly stating
+ and proving an inversion lemma for every `Inductive` definition we make.
+
+ Here, the [inversion] tactic can detect (1) that the first case, where n = 0, does not apply and (2) that the n' that appears
+ in the ev_SS case must be the same as n. It includes an "as" annotation similar to [destruct], allowing us to assign names rather
+ than have Coq choose them.
+ *)
+Theorem evSS_ev' : forall n,
+    ev (S (S n)) -> ev n.
+Proof.
+  intros n E. inversion E as [| n' E' Heq].
+  apply E'. Qed.
+
+(* The [inversion] tactic can apply the principle of explosion to "obviously contradictory" hypotheses involving inductively defined
+ properties, something that takes a bit more work using our inversion lemma. Compare:
+ *)
+Theorem one_not_even : ~ ev 1.
+Proof.
+  intros H. apply ev_inversion in H.
+  destruct H as [| [m [Hm _]]].
+  - discriminate H.
+  - discriminate Hm. Qed.
+
+Theorem one_not_even' : ~ ev 1.
+Proof.
+  intros H. inversion H. Qed.
+
+
+Theorem SSSSev__even : forall n,
+    ev (S (S (S (S n)))) -> ev n.
+Proof.
+  intros n H. apply ev_inversion in H.
+  destruct H as [H | H].
+  - discriminate H.
+  - destruct H as [n' [H1 H2]].
+    injection H1 as H1'. rewrite <- H1' in H2.
+    apply evSS_ev. apply H2. Qed.
+
+Theorem SSSSev__even' : forall n,
+    ev (S (S (S (S n)))) -> ev n.
+Proof.
+  intros n E. inversion E as [| n' E' Heq].
+  inversion E' as [| n'' E'' Heq']. apply E''. Qed.
+
+Theorem ev5_nonsense : ev 5 -> 2 + 2 = 9.
+Proof.
+  intros H.
+  inversion H as [| n' H' Heq].
+  inversion H' as [| n'' H'' Heq'].
+  inversion H'' as [| n''' H''' Heq''].
+  Qed.
+
+(* The [inversion] tactic does quite a bit of work. For example, when applied to an equality assumption, it does
+ the work of both [discriminate] and [injection]. In addition, it carries out the [intros] and [rewrite] that are
+ typically necessary in the case of [injection]. It can also be applied to analyze evidence for arbitrary inductively
+ defined propositions, not just equality. As examples, we'll use it to re-prove some theorems from chapter `Tactics`.
+ *)
+Theorem inversion_ex1 : forall (n m o : nat),
+    [n; m] = [o; o] -> [n] = [m].
+Proof.
+  intros n m o H. inversion H as [[H1 H2]].
+  reflexivity. Qed.
+
+Theorem inversion_ex2 : forall (n : nat),
+    S n = O -> 2 + 2 = 5.
+Proof.
+  intros n contra. inversion contra. Qed.
+
+(* Here's how [inversion] works in general:
+
+    - Suppose that name `H` refers to an assumption `P` in the current context, where P has been defined by an
+      `Inductive` declaration.
+    - Then, for each of the constructors of `P`, [inversion H] generates a subgoal in which `H` has been replaced
+      by the specific conditions under which this constructor could have been used to prove `P`.
+    - Some of these subgoals will be self-contradictory; [inversion] throws these away.
+    - The ones that are left represent the cases that must be proved to establish the original goal. For those
+      [inversion] adds to the proof context all equations that must hold of the arguments given to P -- e.g., n'=n
+      in the proof evSS_ev.
+
+ The `ev_double` exercise above shows that our new notion of evenness is implied by the two earlier ones (since, by
+ `even_bool_prop` in chapter `Logic`, we already know that those are equivalent to each other). To show that all three
+ coincide, we just need the following lemma.
+
+ We could try to proceed by case analysis or induction on n. But since ev is mentioned in a premise, this strategy seems
+ unpromising, because (as we've noted before) the induction hypothesis will talk about n-1 (which is not even!). Thus,
+ it seems better to first try inversion on the evidence for ev. Indeed, the first case can be solved trivially. And we
+ can seemingly make progress on the second case with a helper lemma.
+
+ Unfortunately, the second case is harder. We need to show `exists n0, S (S n') = double n0`, but the only available
+ assumption is `E'`, which states that `ev n'` holds. Since this isn't directly useful, it seems that we are stuck and
+ that performing case analysis on `E` was a waste of time.
+
+ If we look more closely at our second goal, however, we can see that something interesting happened: By performing case
+ on `E`, we were able to reduce the original result to a similar one that involves a different piece of evidence for `ev`:
+ namely `E'`. More formally, we could finish our proof if we could show that
+
+    exists k', n' = double k',
+
+ which is the same as the original statement, but with `n'` instead of `n`. Indeed, it is not difficult to convince Coq that
+ this intermediate result would suffice.
+ *)
+Lemma ev_Even_firsttry : forall n,
+    ev n -> Even n.
+Proof.
+  unfold Even. intros n E.
+  inversion E as [EQ' | n' E' EQ'].
+  - (* E = ev_0 *)
+    exists 0. reflexivity.
+  - (* E = ev_SS n' E' *)
+    assert (H: (exists k', n' = double k') -> (exists n0, S (S n') = double n0)).
+    { intros [k' EQ'']. exists (S k'). simpl.
+      rewrite <- EQ''. reflexivity. }
+    apply H.
+    (* Unfortunately, now we are stuck. To see this clearly, let's move `E'` back into the goal from the hypotheses. *)
+    generalize dependent E'.
+    (* Now it is obvious that we are trying to prove another instance of the same theorem we set out to prove -- only
+     here we are talking about `n'` instead of `n`.
+     *)
+    Abort.
+
+(** Induction on Evidence
+
+ 
  *)
