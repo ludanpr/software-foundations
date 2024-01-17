@@ -455,5 +455,62 @@ Proof.
 
 (** Induction on Evidence
 
- 
+ If this story feels familiar, it is no coincidence: We encountered similar problems in the `Induction` chapter,
+ when trying to use case analysis to prove results that required induction. And once again the solution is ...
+ induction.
+
+ The behavior of [induction] on evidence is the same as its behavior on data: it causes Coq to generate one subgoal
+ for each constructor that could have used to build that evidence, while providing an induction hypothesis for each
+ recursive occurrence of the property in question.
+
+ To prove that a property of `n` holds for all even numbers (i.e., those for which `ev n` holds), we can use induction
+ on `ev n`. This requires us to prove two things, corresponding to the two ways in which `ev n` could have been constructed.
+ If it was constructed by `ev_0`, then `n=0` and the property must hold for 0. If it was constructed by `ev_SS`, then
+ the evidence of `ev n` is of the form `ev_SS n' E'`, where `n = S (S n')` and `E'` is evidence for `ev n'`.
+
+ Here, we can see that Coq produced an `IH` that corresponds to `E'`, the single recursive occurrence of `ev` in
+ its own definition. Since `E'` mentions `n'`, the induction hypothesis talks about `n'`, as opposed to `n` or some
+ other number.
  *)
+Lemma ev_Even : forall n,
+    ev n -> Even n.
+Proof.
+  intros n E. induction E as [| n' E' IH].
+  - (* E = ev_0 *)
+    unfold Even. exists 0. reflexivity.
+  - (* E = ev_SS n' E' with IH : Even n' *)
+    unfold Even in IH. destruct IH as [k Hk].
+    rewrite Hk. unfold Even. exists (S k).
+    simpl. reflexivity. Qed.
+
+(* The equivalence between the second and third definitions of evenness now follows *)
+Theorem ev_Even_iff : forall n,
+    ev n <-> Even n.
+Proof.
+  intros n. split.
+  - apply ev_Even.
+  - unfold Even. intros [k Hk].
+    rewrite Hk. apply ev_double. Qed.
+
+
+Theorem ev_sum : forall n m,
+    ev n -> ev m -> ev (n + m).
+Proof.
+  intros n m En. induction En as [| n' En' IH].
+  - simpl. intros EQ. apply EQ.
+  - simpl. intros H.
+    apply ev_SS. apply IH. apply H. Qed.
+
+(* In general, there may be multiple ways of defining a property inductively. For example, here's a (slightly
+ contrived) alternative definition of `ev`:
+ *)
+Inductive ev' : nat -> Prop :=
+| ev'_0 : ev' 0
+| ev'_2 : ev' 2
+| ev'_sum n m (Hn : ev' n) (Hm : ev' m) : ev' (n + m).
+
+Theorem ev'_ev : forall n,
+    ev' n <-> ev n.
+Proof.
+  intros n. split.
+  - Show. Abort.
