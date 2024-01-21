@@ -534,4 +534,58 @@ Proof.
   - simpl. intros H. apply (evSS_ev (n' + m)) in H.
     apply IH. apply H. Qed.
 
+(** Inductive Relations
+
+ A proposition parameterized by a number (such as `ev`) can be thought of as a property -- i.e., it defines a
+ subset of `nat`, namely those numbers for which the proposition is provable. In the same way, a two-argument
+ proposition can be thought of as a relation -- i.e., it defines a set of pairs for which the proposition is
+ provable.
+ *)
+Module Playground.
+
+(* Just like properties, relations can be defined inductively.
+ *)
+Inductive le : nat -> nat -> Prop :=
+  | le_n (n : nat) : le n n
+  | le_S (n m : nat) (H : le n m) : le n (S m).
+
+Notation "n <= m" := (le n m).
+
+(* Proofs of facts about <= using the constructors `le_n` and `le_S` follow the same patterns as proofs about
+ properties, like `ev` above. We can [apply] the constructors to prove <= goals, and we can use tactics like
+ [inversion] to extract information <= hypothesis in the context.
+
+ Here are some sanity checks on the definition. (Notice that, although these are the same kind of simple "unit
+ tests" as we gave for the testing functions we wrote in the first few lectures, we must construct their proofs
+ explicitly -- simpl and reflexivity don't do the job, because the proofs aren't just a matter of simplifying
+ computations.)
+ *)
+Theorem test_le1 : 3 <= 3.
+Proof.
+  apply le_n. Qed.
+
+Theorem test_le2 : 3 <= 6.
+Proof.
+  apply le_S. apply le_S. apply le_S. apply le_n. Qed.
+
+Theorem test_le3 : (2 <= 1) -> 2 + 2 = 5.
+Proof.
+  intros H. inversion H. inversion H2. Qed.
+
+(* The "strictly less than" relation n < m can now be defined in terms of `le`
+ *)
+Definition lt (n m : nat) := lt (S n) m.
+
+Notation "n < m" := (lt n m).
+
+End Playground.
+
+Inductive total_relation : nat -> nat -> Prop :=
+  | tot (n m : nat) (H : True) : total_relation n m.
+
+Theorem total_relation_is_total : forall n m,
+    total_relation n m.
+Proof.
+  intros n m. apply tot. reflexivity. Qed.
+
 
