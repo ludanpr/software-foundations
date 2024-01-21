@@ -513,4 +513,25 @@ Theorem ev'_ev : forall n,
     ev' n <-> ev n.
 Proof.
   intros n. split.
-  - Show. Abort.
+  - intros E. induction E.
+    + apply ev_0.
+    + apply (ev_SS 0 ev_0).
+    + apply ev_sum. apply IHE1. apply IHE2.
+  - intros E. induction E as [| n' E' IH].
+    + apply ev'_0.
+    + assert (H: S (S n') = 2 + n').
+      { simpl. reflexivity. }
+      rewrite H. apply ev'_sum.
+      * apply ev'_2.
+      * apply IH. Qed.
+
+Theorem ev_ev__ev : forall n m,
+    ev (n + m) -> ev n -> ev m.
+Proof.
+  intros n m Emn En. generalize dependent Emn.
+  induction En as [| n' En' IH].
+  - simpl. intros H. apply H.
+  - simpl. intros H. apply (evSS_ev (n' + m)) in H.
+    apply IH. apply H. Qed.
+
+
