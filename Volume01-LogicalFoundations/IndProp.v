@@ -574,7 +574,7 @@ Proof.
 
 (* The "strictly less than" relation n < m can now be defined in terms of `le`
  *)
-Definition lt (n m : nat) := lt (S n) m.
+Definition lt (n m : nat) := le (S n) m.
 
 Notation "n < m" := (lt n m).
 
@@ -606,4 +606,19 @@ Proof.
   - intros LE. apply LE.
   - intros LE. apply IH in LE.
     apply le_S in LE. apply LE. Qed.
+
+Theorem O_le_n : forall n,
+    0 <= n.
+Proof.
+  intros n. induction n as [| n' IHn'].
+  - apply le_n.
+  - apply le_S. apply IHn'. Qed.
+
+Theorem n_le_m__Sn_le_Sm : forall n m,
+    n <= m -> S n <= S m.
+Proof.
+  intros n m H. induction H as [| m' E IH].
+  - apply le_n.
+  - apply le_S. apply IH. Qed.
+
 
