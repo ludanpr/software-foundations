@@ -588,4 +588,22 @@ Theorem total_relation_is_total : forall n m,
 Proof.
   intros n m. apply tot. reflexivity. Qed.
 
+(* From the definition of `le`, we can sketch the bahaviors of [destruct], [inversion], and
+ [induction] on a hyposthesis `H` providing evidence of the form `le e1 e2`. Doing [destruct H]
+ will generate two cases. In the first case, `e1 = e2`, and it will replace instances of `e2`
+ with `e1` in the goal and context. In the second case, `e2 = S n'` for some `n'` for which
+ `le e1 n'` holds, and it will replace instances of `e2` with `S n'`. Doing [inversion H] will
+ remove impossible cases and add generated equalities to the context for further use. Doing
+ [induction H] will, in the second case, add the induction hypothesis that the goal holds when
+ `e2` is replaced by `n'`.
+ *)
+
+Lemma le_trans : forall m n o,
+    m <= n -> n <= o -> m <= o.
+Proof.
+  intros m n o H1 H2. generalize dependent H1.
+  induction H2 as [| o' E IH].
+  - intros LE. apply LE.
+  - intros LE. apply IH in LE.
+    apply le_S in LE. apply LE. Qed.
 
