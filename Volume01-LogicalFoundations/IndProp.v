@@ -621,4 +621,14 @@ Proof.
   - apply le_n.
   - apply le_S. apply IH. Qed.
 
+Theorem Sn_le_Sm__n_le_m : forall n m,
+    S n <= S m -> n <= m.
+Proof.
+  intros n m H. inversion H as [| n' E Heq].
+  - apply le_n.
+  - assert (H': n <= S n -> S n <= m -> n <= m).
+    { apply le_trans. }
+    apply H'.
+    + apply le_S. apply le_n.
+    + apply E. Qed.
 
