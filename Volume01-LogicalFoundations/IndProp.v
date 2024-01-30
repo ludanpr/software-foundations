@@ -632,3 +632,43 @@ Proof.
     + apply le_S. apply le_n.
     + apply E. Qed.
 
+(* Pretty sure there's a simpler solution to this.
+ *)
+Theorem lt_ge_cases : forall n m,
+    n < m \/ n >= m.
+Proof.
+  intros n m. induction m as [| m' IHm'].
+  - right. apply O_le_n.
+  - destruct IHm' as [IH | IH].
+    + left. induction IH as [| n' E IH'].
+      * apply le_S. apply le_n.
+      * apply le_S. apply le_S. apply E.
+    + induction IH as [| n' E IH'].
+      * left. apply le_n.
+      * right. apply n_le_m__Sn_le_Sm. apply E. Qed.
+
+Theorem le_plus_1 : forall a b,
+    a <= a + b.
+Proof.
+  intros a b. induction a as [| a' IHa'].
+  - simpl. apply O_le_n.
+  - rewrite add_comm. rewrite <- plus_n_Sm.
+    apply n_le_m__Sn_le_Sm. rewrite add_comm.
+    apply IHa'. Qed.
+
+Theorem plus_le : forall n1 n2 m,
+    n1 + n2 <= m -> n1 <= m /\ n2 <= m.
+Proof.
+  intros n1 n2 m H.
+  split.
+  - assert (H': n1 <= n1 + n2).
+    { apply le_plus_1. }
+    apply (le_trans n1 (n1 + n2) m).
+    apply H'. apply H.
+  - assert (H' : n2 <= n2 + n1).
+    { apply le_plus_1. }
+    rewrite add_comm in H.
+    apply (le_trans n2 (n2 + n1) m).
+    apply H'. apply H. Qed.
+
+
